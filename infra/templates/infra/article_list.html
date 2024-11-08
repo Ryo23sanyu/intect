@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}案件一覧{% endblock title %}
+{% block h1 %}案件一覧{% endblock %}
+
+<!-- 並び替え用のプルダウンメニュー -->
+<label for="order_by">並び替え：</label>
+<select id="order_by" name="order_by" onchange="handleOrderChange()">
+  <option value="article_name">土木事務所名</option>
+  <option value="number">対象数</option>
+  <option value="other">その他</option>
+</select>
+
+{% block content %}
+<div class="mt-3">
+  <a href="{% url 'create-article' %}" class="btn btn-primary">案件登録</a>
+</div>
+<div class="d-flex flex-wrap">
+  {% for item in object_list %}
+    <div class="p-4 m-4 bg-light border border-success rounded" style="width: 19rem;">
+      <h2 class="text-success">{{ item.案件名 }}</h2><br>
+      <h6 class="card-text">発注者：{{ item.土木事務所 }}</h6>
+      <h6 class="card-text">対象数：{{ item.対象数 }} 橋</h6>
+      <h6 class="card-text">担当者：{{ item.担当者名 }}</h6>
+      <h6 class="card-text">備考　：{{ item.その他 }}</h6>
+      <div class="mt-3">
+        <a href="{% url 'list-infra' item.pk %}" class="btn btn-primary">対象一覧</a>
+        <a href="{% url 'detail-article' item.pk %}" class="btn btn-primary">詳細</a>
+        <a href="{% url 'names-list' item.pk %}" class="btn btn-primary">名前登録</a>
+      </div>
+    </div>
+  {% endfor %}
+{% endblock content %}
+
+<script>
+  function handleOrderChange() {
+    // プルダウンメニューが変更されたときの処理をここに追加
+    var orderSelect = document.getElementById("order_by");
+    var selectedValue = orderSelect.value;
+
+    // 選択された値を使って何かしらの処理を行う（例：Ajaxでデータを取得するなど）
+    console.log("選択された値: ", selectedValue);
+  }
+
+    var sidebar = document.querySelector('.sidebar');
+  var sidebarToggle = document.querySelector('.sidebar-toggle');
+
+  sidebarToggle.addEventListener('click', function() {
+    sidebar.classList.toggle('open');
+  });
+</script>

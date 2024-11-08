@@ -1,0 +1,485 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block title %}番号登録{% endblock title %}
+{% block h1 %}番号登録{% endblock %}
+
+{% block content %}
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0; /* 0にすることで余白をなくす */
+    }
+    .form-section {
+        margin-bottom: 20px; /* 各フォームセクションの下に20pxのマージンを追加 */
+    }
+    .form-section label {
+        display: block; /* ラベルをブロックで表示 */
+        margin-bottom: 5px; /* ラベルの下に5pxのマージンを追加 */
+    }
+    .form-section input, .form-section select, .form-number-section input, .form-number-section select {
+        width: 150px;
+        padding: 5px;
+        margin-bottom: 10px;
+    }
+    /* 径間番号、部材名、部材記号のそれぞれの幅を変更します */
+    #span_number {
+        height: 40px;
+        width: 80px;
+    }
+    #part-name {
+        height: 40px;
+        width: 220px;
+    }
+    #symbol {
+        height: 40px;
+        width: 80px;
+    }
+    .form-section {
+        display: flex; /* フレックスボックスのレイアウトに変更 */
+        align-items: baseline; /* 中央揃え */
+        gap: 10px;
+    }
+    .form-number-section {
+        align-items: baseline;
+        gap: 10px;
+    }
+    .inline-group {
+        display: flex; /* フレックスボックスのレイアウトに変更 */
+        align-items: baseline; /* 垂直方向に中央揃え */
+        gap: 15px; /* フレックスアイテム間の空間 */
+        margin-bottom: 10px;
+    }
+    .form-section .inline-group label {
+        margin: 0;
+    }
+    .form-section .inline-group input, .form-section, .form-number-section .inline-group select {
+        margin: 0 10px; /* 右に10pxのマージンを追加 */
+    }
+    button.toggle-button {
+        margin: 0 5px;
+        padding: 5px 10px;
+        cursor: pointer; /* ポインター（手形のカーソル）に変更 */
+        background-color: #ddd;
+        border: none;
+        border-radius: 5px; /* 境界線の角を丸く */
+    }
+    button.toggle-button.selected {
+        background-color: #007bff;
+        color: white;
+    }
+    .form-number-section .entries .entry {
+        display: inline-block;
+        margin-right: 10px;
+        white-space: nowrap;
+        gap: 10px; /* エントリ間の間隔を整える */
+    }
+    button {
+        margin-top: 5px;
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+    /* チェックボックス自体を非表示にします。 */
+    input[type="checkbox"] {
+        display: none;
+    }
+    
+    /* チェックボックスがチェックされた状態と未チェックの状態でラベルの見た目を変えます。 */
+    input[type="checkbox"] + label {
+        display: inline-block;
+        padding: 10px 20px;
+        border: 2px solid #008CBA;  /* ボタンの枠線の色。 */
+        background-color: white;    /* ボタンの背景色。 */
+        color: #008CBA;             /* 文字の色。 */
+        cursor: pointer;
+        border-radius: 5px;         /* ボタンの角に丸みを付けます。 */
+        transition: background-color 0.3s, color 0.3s; /* ボタンの色変更をスムーズに。 */
+    }
+    
+    input[type="checkbox"]:checked + label {
+        background-color: #ff0033;  /* チェックされた状態の背景色。 */
+        color: white;               /* チェックされた状態の文字色。 */
+    }
+    .details-content {
+        padding: 5px;
+        display: flex;
+        flex-wrap: wrap; /* コンテンツが横並びになり、枠を超えると改行される */
+    }
+    .details-content p {
+        margin: 0 10px 10px 0; /* 個々のエレメント間のマージンを設定 */
+        padding: 5px;
+        width: 80px; /* 数字の幅を設定 */
+        text-align: center; /* 数字のテキストを中央に配置 */
+        border: 1px solid #ddd; /* 枠を追加して見やすく */
+        border-radius: 5px; /* 角を丸くする */
+    }
+    .details-summary {
+        position: relative; /* サマリー要素の位置を相対的に設定（子要素を絶対位置で配置するため） */
+        display: block;
+        padding: 20px;
+        color: #fff;
+        font-size: 24px;
+        font-weight: bold;
+        text-align: center;
+        background-color: #b2e4e2;
+        cursor: pointer;
+    }
+    .details-summary:hover {
+        opacity: 0.8; /* サマリーにホバーした時の透明度を0.8に変更 */
+    }
+    .details-summary .btn {
+        position: absolute; /* ボタンの位置を絶対位置に設定 */
+        top: 50%;
+        left: 10px;
+        width: 18px;
+        height: 18px;
+        transform-origin: center center; /* 回転の中心をボタンの中央 */
+        transition-duration: 0.2s; /* トランジションの持続時間を0.2秒に設定（アニメーション用） */
+    }
+    .details-summary .btn:before,
+    .details-summary .btn:after {
+        content: ""; /* 擬似要素の内容を空 */
+        background-color: #fff;
+        border-radius: 10px; /* 角を丸く */
+        width: 18px;
+        height: 4px;
+        position: absolute; /* 擬似要素の位置を絶対位置に設定 */
+        top: 50%;
+        left: 0;
+        transform-origin: center center; /* 回転の中心を中央 */
+    }
+    .details-summary .btn:before {
+        width: 4px;
+        height: 18px;
+        top: 0;
+        left: 7px;
+    }
+    .details-summary .btn:before {
+        top: 0;
+        left: 7px;
+    }
+    .details-summary.is-active .btn {
+        transform: rotate(-180deg); /* 展開時にボタンを180度回転 */
+    }
+    .details-summary.is-active .btn:before {
+        content: none;
+    }
+    .details-summary::-webkit-details-marker {
+        display: none;
+    }
+    
+    /* プルダウン内に検索ボックスを表示 */
+    .dropdown-container {
+        position: relative;
+        display: inline-block;
+    }
+    .dropdown-search {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 5px;
+        font-size: 16px;
+        border: none; /* ボーダーを削除 */
+    }
+    .dropdown-search:focus {
+        outline: none;
+    }
+    .dropdown-item {
+        display: none;
+    }
+    .delete-number-button {
+        font-size: 8px;  /* フォントサイズをさらに小さく */
+        padding: 2px 5px;  /* パディングを調整してボタンを小さく */
+        border: none;  /* ボーダーをなしに */
+        background: red;  /* ボタンの背景色を赤に */
+        color: white;  /* ボタンのテキストカラーを白に */
+        border-radius: 50%;  /* ボタンを丸くする */
+        width: 20px;  /* ボタンの幅 */
+        height: 20px;  /* ボタンの高さ */
+        line-height: 20px;  /* ボタン内のテキストを中央に配置 */
+        position: absolute;
+        top: -10px;  /* 必要に応じて値を調整 */
+        right: -10px;  /* 必要に応じて値を調整 */
+        cursor: pointer;  /* ホバー時のカーソルをポインタに */
+        text-align: center; /* テキストを中央に配置 */
+    }
+</style>
+
+{# PartsNumber を保存するためにformで囲う #}
+    <form action="" method="post">
+        {% csrf_token %}
+        
+        <div class="inline-group">
+            <label for="span_number">径間番号:</label>
+            <input type="number" id="span_number" name="span_number" value="1">
+        </div>
+
+        <div class="form-section">
+            <div class="inline-group">
+                <label for="part-name">部材名:</label>
+                <select id="part-name" name="parts_name" onchange="toggleMainFrame(this)">
+                    {% for parts_name in parts_names %}
+                    <option value="{{ parts_name.id }}" data-main="{{ parts_name.主要部材|yesno:'true,false' }}">
+                        {{ parts_name.部材名 }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="inline-group">
+                <label for="symbol">部材記号:</label>
+                <input type="text" id="symbol" name="symbol" value="Mg">
+            </div>
+
+            <div class="inline-group">
+                <label>材料:</label>
+                {% for parts_name in parts_names %}
+                    {% for material in parts_name.material.all %}
+                        <input type="checkbox" id="material_{{ parts_name.id }}_{{ material.id }}" name="material" value="{{ material.id }}">
+                        <label class="material-option" for="material_{{ parts_name.id }}_{{ material.id }}" data-parts-id="{{ parts_name.id }}">
+                            {{ material.材料 }}
+                        </label>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+
+            {% for main in main_frames %}
+                <label><input type="checkbox" name="main" value="{{ main.id }}">{{ main.主要部材 }}</label>
+            {% endfor %}
+            <input type="checkbox" id="main_frame" name="main_frame">
+            <label for="main_frame">主要部材{{ article.id }}{{ infra.id }}</label>
+        </div>
+
+        <div class="form-number-section">
+            <label>連続した番号:</label>
+            <button type="button" onclick="addSerialEntry()">追加</button>
+            <div id="serial-entries" class="entries">
+                <div class="entry">
+                    <input type="number" placeholder="番号1" min="1" name="serial_number"> ～ <input type="number" placeholder="番号2" min="1" name="serial_number">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-number-section">
+            <label>単一の番号:</label>
+            <button type="button" onclick="addSingleEntry()">追加</button>
+            <div id="single-entries" class="entries">
+                <div class="entry">
+                    <input type="number" placeholder="番号" min="1" name="single_number">
+                </div>
+            </div>
+        </div>
+
+        {# 保存するためのボタン #}
+        <input type="submit" value="登録">
+
+    </form>
+
+    
+    </br>
+    <h2>現在の登録一覧</h2>
+    {% for title, parts_list in grouped_parts %}
+    <details class="details js-details">
+        <summary class="details-summary js-details-summary"><span class="btn"></span>{{ title }}</summary>
+        <div class="details-content js-details-content">
+            {% if parts_list %}
+                {% for parts in parts_list %}
+                <div style="position: relative; display: inline-block; margin-left: 10px; margin-right: 20px; padding: 10px; border: none;">
+                    <p style="display: inline; margin: 0; position: relative;">{{ parts.number }}</p>
+                    <form action="{% url 'delete_number' article_pk=article_pk pk=pk unique_id=parts.unique_id %}" method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="delete-number-button">✕</button>
+                    </form>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>登録されている番号がありません。</p>
+            {% endif %}
+        </div>
+    </details>
+    {% empty %}
+        <p>登録がありません。</p>
+    {% endfor %}
+
+<script>
+// ボタンの送信機能
+function selectValue(button) {
+    console.log("selectValue");
+    const value = button.getAttribute('data-value');
+    const hiddenInput = document.getElementById('hidden-main');
+    hiddenInput.value = (value === '〇');
+    // Toggle button active class
+    document.querySelectorAll('.toggle-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    button.classList.add('active');
+}
+// 部材名を任意に入れられるようにする
+document.getElementById('part-name').addEventListener('change', function() {
+    var selectElement = document.getElementById('part-name');
+    var selectedOption = selectElement.options[selectElement.selectedIndex];
+    var customInputElement = document.getElementById('custom-part-name');
+    
+    // 選択した値がプルダウンにない場合
+    if (selectedOption.value) {
+        customInputElement.value = selectedOption.text; // カスタムの値を入力
+    } else {
+        customInputElement.value = "";
+    }
+});    
+// 材料ボタンの選択切り替え
+document.addEventListener("DOMContentLoaded", function() {
+    var partsSelect = document.getElementById('part-name');
+    partsSelect.addEventListener('change', function() {
+        var selectedPartId = this.value;
+        var materials = document.querySelectorAll('.material-option');
+        materials.forEach(function(material) {
+            if (material.getAttribute('data-parts-id') == selectedPartId) {
+                material.style.display = 'block';
+            } else {
+                material.style.display = 'none';
+            }
+        });
+    });
+
+    partsSelect.dispatchEvent(new Event('change')); // 初期化
+});
+
+// 主要部材ボタンの選択切り替え
+const mainFrameButtons = document.querySelectorAll('#main-frame-buttons .toggle-button');
+mainFrameButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        mainFrameButtons.forEach(btn => btn.classList.remove('selected'));
+        button.classList.add('selected');
+    });
+});
+// 追加ボタンで表示される入力フォーム
+function addSerialEntry() {
+    const container = document.getElementById('serial-entries');
+    const entryDiv = document.createElement('div');
+    entryDiv.classList.add('entry');
+    entryDiv.innerHTML = `<input type="number" placeholder="番号1" min="1" name="serial_number"> ～ <input type="number" placeholder="番号2" min="1" name="serial_number">`;
+    container.appendChild(entryDiv);
+}
+// 追加ボタンで表示される入力フォーム
+function addSingleEntry() {
+    const container = document.getElementById('single-entries');
+    const entryDiv = document.createElement('div');
+    entryDiv.classList.add('entry');
+    entryDiv.innerHTML = `<input type="number" placeholder="番号" min="1" name="single_number">`;
+    container.appendChild(entryDiv);
+}
+
+function register() {
+    const partName = document.getElementById('part-name').value;
+    const serialEntries = Array.from(document.querySelectorAll('#serial-entries .entry'));
+    const singleEntries = Array.from(document.querySelectorAll('#single-entries .entry'));
+
+    const serialNumbers = serialEntries.map(entry => {
+        const inputs = entry.getElementsByTagName('input');
+        return {from: inputs[0].value, to: inputs[1].value};
+    });
+
+    const singleNumbers = singleEntries.map(entry => entry.getElementsByTagName('input')[0].value);
+
+    console.log("パーツ名:", partName);
+    console.log("連続した番号:", serialNumbers);
+    console.log("単一の番号:", singleNumbers);
+}
+
+// 選択されたパーツ名に基づいて main_frame チェックボックスを切り替える JavaScript 関数
+function toggleMainFrame(selectElement) {
+    var selectedOption = selectElement.options[selectElement.selectedIndex];
+    var isMain = selectedOption.getAttribute('data-main') === 'true';
+    document.getElementById('main_frame').checked = isMain;
+}
+
+// ページの読み込み時に初期状態を設定する関数を自動的に呼び出す
+document.addEventListener('DOMContentLoaded', function() {
+    var selectElement = document.getElementById('part-name');
+    toggleMainFrame(selectElement);
+});
+$(document).ready(function(){
+    $('#part-name').change(function(){
+        var partId = $(this).val();
+        $.ajax({
+            url: "{% url 'ajax_get_symbol' %}",
+            data: {
+                'part_id': partId
+            },
+            success: function(data){
+                $('#symbol').val(data.symbol);
+            }
+        });
+    });
+});
+let accordionDetails = '.js-details';
+let accordionSummary = '.js-details-summary';
+let accordionContent = '.js-details-content';
+let speed = 500;
+
+$(accordionDetails).on("mouseenter", function(event) {
+  // summaryにis-activeクラスを切り替え
+  $(this).find(accordionSummary).addClass("is-active");
+  // open属性を付ける
+  $(this).attr("open", "true");
+  // いったんdisplay:none;してからslideDownで開く
+  $(this).find(accordionContent).hide().slideDown(speed);
+});
+
+$(accordionDetails).on("mouseleave", function(event) {
+  // summaryからis-activeクラスを削除
+  $(this).find(accordionSummary).removeClass("is-active");
+  // アコーディオンを閉じるときの処理
+  $(this).find(accordionContent).slideUp(speed, function() {
+    // アニメーションの完了後にopen属性を取り除く
+    $(this).parent($(accordionDetails)).removeAttr("open");
+    // display:none;を消して、ページ内検索にヒットするようにする
+    $(this).show();
+  });
+});
+document.addEventListener('DOMContentLoaded', function() {
+    var partsSelect = document.getElementById('part-name');
+    partsSelect.addEventListener('change', function() {
+        // 正しいセレクトボックスのIDを確認する
+        var selectedPartId = this.value;
+        var materials = document.querySelectorAll('.material-option');
+        materials.forEach(function(material) {
+            if (material.getAttribute('data-parts-id') == selectedPartId) {
+                material.style.display = 'block';
+            } else {
+                material.style.display = 'none';
+            }
+        });
+    });
+
+    partsSelect.dispatchEvent(new Event('change')); // 初期化
+});
+
+$(document).ready(function(){
+    $('#part-name').change(function(){
+        var partId = $(this).val();
+        $.ajax({
+            url: "{% url 'ajax_get_symbol' %}",
+            data: {
+                'part_id': partId
+            },
+            success: function(data){
+                $('#symbol').val(data.symbol);
+            }
+        });
+    });
+});
+
+function toggleMainFrame(selectElement) {
+    var selectedOption = selectElement.options[selectElement.selectedIndex];
+    var isMain = selectedOption.getAttribute('data-main') === 'true';
+    document.getElementById('main_frame').checked = isMain;
+}
+
+// ページ初期化時にもトグルを実行
+document.addEventListener('DOMContentLoaded', function() {
+    var selectElement = document.getElementById('part-name');
+    toggleMainFrame(selectElement);
+});
+</script>
+{% endblock %}

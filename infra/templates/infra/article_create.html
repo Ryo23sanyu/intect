@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}案件作成{% endblock title %}
+
+{% block content %}
+<style>
+  #file-tree-container {
+      max-height: 500px; /* 必要に応じて高さを調整 */
+      max-width: 725px; /* 必要に応じて高さを調整 */
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 10px;
+  }
+  .form-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .form-group label {
+    width: 125px; /* ラベルの固定幅 */
+    padding-right: 10px; 
+    text-align: left; /* ラベルを左揃え */
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 40%; /* 入力欄の幅を画面の半分にする */
+  }
+</style>
+
+<form method='POST' novalidate>
+  {% csrf_token %}
+  <div class="form-group">
+    <label for="{{ form.案件名.id_for_label }}">案件名</label>
+    {{ form.案件名 }}
+  </div>
+  <div class="form-group">
+    <label for="{{ form.土木事務所.id_for_label }}">土木事務所</label>
+    {{ form.土木事務所 }}
+  </div>
+  <div class="form-group">
+    <label for="{{ form.対象数.id_for_label }}">対象数</label>
+    {{ form.対象数 }}
+  </div>
+  <div class="form-group">
+    <label for="{{ form.担当者名.id_for_label }}">担当者名</label>
+    {{ form.担当者名 }}
+  </div>
+  <div class="form-group">
+    <label for="{{ form.その他.id_for_label }}">その他</label>
+    {{ form.その他 }}
+  </div>
+
+  <div>
+    <input type='submit' value='作成'>
+  </div>
+  {% comment %} <div class="form-group">
+    <label for="id_file_path">ファイルパス</label>
+    <input id="id_file_path" name="ファイルパス" type="text" value="{{ form.initial.ファイルパス }}">
+    <button type="button" onclick="toggleFileTree()">ファイル選択</button>
+  </div>
+  <div>
+    <input type='submit' value='作成'>
+  </div>
+
+  <div id="file-tree-container" style="display: none;">
+    <tbody id="file-tree">
+        <button type="button" class="toggle-btn" onclick="toggleDirectory(this, '/')">+</button> ホームディレクトリ
+        <!-- onclick="toggleDirectory(this, '{{ root_dir|urlencode }}')" -->
+    </tbody>
+  </div>
+</form>
+
+<script>
+  function toggleFileTree() {
+    const container = document.getElementById('file-tree-container');
+    container.style.display = container.style.display === 'none' ? 'block' : 'none';
+  }
+  
+  function toggleDirectory(button, path) {
+    const parentLi = button.parentElement;
+    const nextElement = parentLi.querySelector('ul');
+
+    if (nextElement) {
+        if (nextElement.style.display === 'none') {
+            nextElement.style.display = 'block';
+            button.innerText = '-';
+        } else {
+            nextElement.style.display = 'none';
+            button.innerText = '+';
+        }
+    } else {
+        fetch("{% url 'get-subdirectories' %}?path=" + encodeURIComponent(path))
+            .then(response => response.json())
+            .then(data => {
+                const ul = document.createElement('ul');
+                data.directories.forEach(subDir => {
+                    // const fullPath = path + '/' + subDir;(デスクトップディレクトリ)
+                    const fullPath = (path === '/') ? '/' + subDir : path + '/' + subDir;
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                      <button type="button" class="toggle-btn" onclick="toggleDirectory(this, '${fullPath.replace(/'/g, "\\'")}')">+</button> 
+                      ${subDir} 
+                      <button type="button" style="background-color: orange; color: white;" onclick="selectDirectory('${fullPath.replace(/'/g, "\\'")}')">選択</button>`;
+                    ul.appendChild(li);
+                });
+                data.files.forEach(file => {
+                    const li = document.createElement('li');
+                    // const filePath = path + '/' + file;(デスクトップディレクトリ)
+                    const filePath = (path === '/') ? '/' + file : path + '/' + file;
+                    li.textContent = file;
+                    li.onclick = function () { selectFile(filePath); };
+                    ul.appendChild(li);
+                });
+                button.innerText = '-';
+                parentLi.appendChild(ul);
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                alert('サブディレクトリの取得中にエラーが発生しました');
+            });
+    }
+  }
+
+  function selectFile(filePath) {
+    document.getElementById('id_file_path').value = filePath;
+    document.cookie = "selected_file=" + encodeURIComponent(filePath) + "; path=/";
+  }
+
+  function selectDirectory(dirPath) {
+    document.getElementById('id_file_path').value = dirPath;
+    document.cookie = "selected_file=" + encodeURIComponent(dirPath) + "; path=/";
+  }
+</script>
+{% endcomment %}
+
+{% endblock content %}

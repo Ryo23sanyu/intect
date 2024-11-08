@@ -1,0 +1,195 @@
+a {
+  text-decoration: none;
+}
+
+.field {
+  display: flex;
+}
+
+.sidebar {
+  position: absolute;
+  padding-top: 0;
+  /* 上部ナビゲーションの高さにあわせる。 */
+  top: 56px;
+  /* 初期状態でleft はwidth 文だけマイナスしておく。*/
+  left: -300px;
+  width: 300px;  /* バーの幅を適切な値に指定する */
+  /* height: 125%; /* バーの高さを画面の高さに合わせる */
+  /* 高さは画面に応じて */
+  height: 100%;
+  background-color: #f8f9fa;
+  color: #333;
+  width: 200px;
+  z-index: 1000;
+  /* .openが追加されたとき、アニメーションを発動させる。 */
+  transition:0.2s
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar ul li {
+  padding: 10px;
+}
+
+.sidebar ul li a {
+  text-decoration: none;
+  color: #333;
+}
+
+.sidebar ul li a:hover {
+  color: #f00;
+}
+
+.sidebar-toggle {
+    position:fixed;
+    bottom:0;
+    left:0;
+    z-index:2000;
+}
+
+.open{
+    left:0;
+}
+
+.picture img {
+  width: 200px;
+}
+
+.vert {
+  display: flex;
+  /*-webkit-justify-content: space-around; /*横方向に均等間隔で配置*/
+  /*justify-content: space-around; /*周囲に均等間隔で配置*/
+  /*align-items: flex-start; /*上端合わせ*/
+  /*align-items: flex-end; /*下端合わせ*/
+  align-items: center; /*中央合わせ*/
+  /*align-items: baseline; /*文字の基準点をそろえる*/
+  /*align-items: stretch; /*枠に合わせて伸ばす*/
+  flex-direction: column; /*縦並び*/
+  /*height: 200px; /*行の高さを200pxに固定*/
+  list-style:none;
+}
+
+.side {
+  display: flex;
+  /*-webkit-justify-content: space-around; /*横方向に均等間隔で配置*/
+  /*justify-content: space-around; /*周囲に均等間隔で配置*/
+  /*align-items: flex-start; /*上端合わせ*/
+  /*align-items: flex-end; /*下端合わせ*/
+  align-items: center; /*中央合わせ*/
+  /*align-items: baseline; /*文字の基準点をそろえる*/
+  /*align-items: stretch; /*枠に合わせて伸ばす*/
+  flex-direction: row; /*横並び*/
+  /*height: 200px; /*行の高さを200pxに固定*/
+  list-style:none;
+}
+
+.my-button {
+  background-color: #007bff; /* ボタンの背景色を青色にする */
+  color: white; /* 文字色を白色にする */
+  padding: 10px 20px; /* 上下に10px、左右に20pxのパディングを追加 */
+  font-size: 16px; /* フォントサイズを大きくする */
+  border: none; /* 枠線を非表示にする */
+  cursor: pointer; /* マウスホバー時にカーソルをポインターに変更 */
+  border-radius: 5px; /* ボーダーの角を丸くする */
+}
+
+.map-container,
+.form-container {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.form-container {
+    padding-left: 20px; /* フォームと地図の間隔 */
+}
+/* 緒言のボタン選択 */
+.input_chk {
+  display:none;
+}
+.chk_label {
+  display:inline-block;
+  position:relative;/*相対的な位置を指定*/
+  width:4rem;/*相対的な位置から大きさや幅を指定*/
+  height:2rem;
+  margin:0.25rem;
+  border-radius:1rem;
+  background:darkgray;
+  transition:0.2s;
+  cursor:pointer;
+  box-shadow:0 4px 4px -2px #333 inset;
+}
+.chk_label:before {
+  content:"";
+  position:absolute;
+  top:0;
+  left:0;
+  width:50%;
+  height:100%;
+  border:1px solid gray;
+  border-radius:1rem;
+  background:white;
+  transition:0.2s;
+  box-shadow:4px 0 2px -2px #333;
+}
+
+input[type="checkbox"].input_chk:checked + label.chk_label{ background:orange; }
+input[type="checkbox"].input_chk:checked + label.chk_label:before{ left:50%; }
+
+input[type="radio"].input_chk:checked + label.chk_label{ background:orange; }
+input[type="radio"].input_chk:checked + label.chk_label:before{ left:50%; }
+
+.surround_label {
+  display: inline-block;
+  position: relative;
+  padding: 0.5rem;
+  border: solid 1px orange;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+input[type="checkbox"].input_chk:checked + label.surround_label{
+  background:orange;
+  transition:0.2s;
+}
+input[type="radio"].input_chk:checked + label.surround_label{
+  background:orange;
+  transition:0.2s;
+}
+/* damage_tableの「径間」ボタンに適用するスタイル */
+.keikan-button-style {
+  width: 60px; /* ボタンの幅 */
+  height: 45px; /* ボタンの高さ */
+  background-color: blue; /* ボタンの背景色 */
+  color: white; /* ボタンの文字色 */
+  text-align: center; /* テキストをボタンの中央に配置 */
+  display: block; /* ブロック要素として扱う */
+  margin-left: auto; /* 左側のマージンを自動で調整して右詰めに */
+  margin-right: 0; /* 右側のマージンは0 */
+}
+
+/* プログレスバーのスタイル */
+#progress-container {
+    width: 100%;
+    background-color: #f3f3f3;
+    padding: 3px;
+    border: 1px solid #ccc;
+    margin-top: 10px;
+    display: none; /* 初期状態は非表示 */
+}
+
+#progress-bar {
+    width: 0;
+    height: 20px;
+    background-color: #4caf50;
+}
+
+.my-table {
+  width: 100%;
+}
+/* 追加したスタイル */
+.full-width-table {
+  width: 100%; 
+}

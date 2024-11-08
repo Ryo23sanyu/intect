@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block title %}ファイルアップロード{% endblock title %}
+{% block h1 %}ファイルアップロード{% endblock %}
+
+{% block content %}
+
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form }}
+        <input class="form-control" type="submit" value="送信">
+    </form>
+
+{% endblock %}

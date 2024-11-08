@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}物件作成{% endblock title %}
+{% block h1 %}物件作成{% endblock %}
+
+<style>
+  .form-control {
+      width: 150%; /* 必要に応じて調整 */
+      height: auto; /* 高さを自動にするか、特定の高さに設定 */
+  }
+</style>
+{% block content %}
+<div class="container">
+  <form method='POST'>
+    {% csrf_token %}
+    <div class="form-group row">
+      <label for="id_title" class="col-sm-2 col-form-label">橋梁名</label>
+      <div class="col-sm-10">
+        {{ form.title }}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_径間数" class="col-sm-2 col-form-label">{{ form.径間数.label }}</label>
+      <div class="col-sm-10">
+        {{ form.径間数 }} 径間
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_橋長" class="col-sm-2 col-form-label">{{ form.橋長.label }}</label>
+      <div class="col-sm-10">
+        {{ form.橋長 }} ｍ
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_全幅員" class="col-sm-2 col-form-label">{{ form.全幅員.label }}</label>
+      <div class="col-sm-10">
+        {{ form.全幅員 }} ｍ
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_latitude" class="col-sm-2 col-form-label">{{ form.橋梁コード.label }}</label>
+      <div class="col-sm-10">
+        {{ form.橋梁コード }}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label class="col-sm-2 col-form-label">{{ form.活荷重.label }}</label>
+      <div class="col-sm-10">
+        {% for loadWeight in loadWeights %}
+        <div class="form-check form-check-inline">
+          <input id="loadWeight_id_{{ loadWeight.id }}" class="input_chk" type="radio" name="活荷重" value="{{ loadWeight.id }}">
+          <label class="surround_label" for="loadWeight_id_{{ loadWeight.id }}">{{ loadWeight.活荷重 }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label class="col-sm-2 col-form-label">{{ form.等級.label }}</label>
+      <div class="col-sm-10">
+        {% for loadGrade in loadGrades %}
+        <div class="form-check form-check-inline">    <!-- 選択形式：radio(1つだけ) checkbox(複数可能) -->
+          <input id="loadGrade_id_{{ loadGrade.id }}" class="input_chk" type="radio" name="等級" value="{{ loadGrade.id }}">
+          <label class="surround_label" for="loadGrade_id_{{ loadGrade.id }}">{{ loadGrade.等級 }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label class="col-sm-2 col-form-label">{{ form.適用示方書.label }}</label>
+      <div class="col-sm-10">
+        {% for rulebook in rulebooks %}
+        <div class="form-check form-check-inline">
+          <input id="rulebook_id_{{ rulebook.id }}" class="input_chk" type="radio" name="適用示方書" value="{{ rulebook.id }}">
+          <label class="surround_label" for="rulebook_id_{{ rulebook.id }}">{{ rulebook.適用示方書 }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_上部構造形式" class="col-sm-2 col-form-label">{{ form.上部構造形式.label }}</label>
+      <div class="col-sm-10">
+        {{ form.上部構造形式 }}
+      </div>
+    </div>
+    <div class="form-group row">
+      <label for="id_下部構造形式" class="col-sm-2 col-form-label">{{ form.下部構造形式.label }}</label>
+      <div class="col-sm-10">
+        {{ form.下部構造形式 }}
+      </div>
+    </div>
+    <div class="form-group row">
+      <label for="id_基礎構造形式" class="col-sm-2 col-form-label">{{ form.基礎構造形式.label }}</label>
+      <div class="col-sm-10">
+        {{ form.基礎構造形式 }}
+      </div>
+    </div>
+
+
+    <div class="form-group row">
+      <label class="col-sm-2 col-form-label">{{ form.近接方法.label }}</label>
+      <div class="col-sm-10">
+        {% for approach in approachs %}
+        <div class="form-check form-check-inline">
+          <input id="approach_id_{{ approach.id }}" class="input_chk" type="checkbox" name="近接方法" value="{{ approach.id }}">
+          <label class="surround_label" for="approach_id_{{ approach.id }}">{{ approach.近接方法 }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label class="col-sm-2 col-form-label">{{ form.交通規制.label }}</label>
+      <div class="col-sm-10">
+        {% for regulation in regulations %}
+        <div class="form-check form-check-inline">
+          <input id="regulation_id_{{ regulation.id }}" class="input_chk" type="radio" name="交通規制" value="{{ regulation.id }}">
+          <label class="surround_label" for="regulation_id_{{ regulation.id }}">{{ regulation.交通規制 }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label class="col-sm-2 col-form-label">{{ form.第三者点検.label }}</label>
+      <div class="col-sm-10">
+        {% for thirdparty in thirdpartys %}
+        <div class="form-check form-check-inline">
+          <input id="thirdparty_id_{{ thirdparty.id }}" class="input_chk" type="radio" name="第三者点検" value="{{ thirdparty.id }}">
+          <label class="surround_label" for="thirdparty_id_{{ thirdparty.id }}">{{ thirdparty.第三者点検 }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_路線名" class="col-sm-2 col-form-label">{{ form.路線名.label }}</label>
+      <div class="col-sm-10">
+        {{ form.路線名 }}
+      </div>
+    </div>
+    
+    <div class="form-group row">
+      <label for="id_latitude" class="col-sm-2 col-form-label">起点側 緯度</label>
+      <div class="col-sm-10">
+        {{ form.latitude }}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_longitude" class="col-sm-2 col-form-label">起点側 経度</label>
+      <div class="col-sm-10">
+        {{ form.end_longitude }}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_end_latitude" class="col-sm-2 col-form-label">終点側 緯度</label>
+      <div class="col-sm-10">
+        {{ form.end_latitude }}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_end_longitude" class="col-sm-2 col-form-label">終点側 経度</label>
+      <div class="col-sm-10">
+        {{ form.end_longitude }}
+      </div>
+    </div>    
+    <div class="form-group row">
+      <label for="id_海岸線との距離" class="col-sm-2 col-form-label">{{ form.海岸線との距離.label }}</label>
+      <div class="col-sm-10">
+        {{ form.海岸線との距離 }} ｍ
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label class="col-sm-2 col-form-label">{{ form.路下条件.label }}</label>
+      <div class="col-sm-10">
+        {% for undercondition in underconditions %}
+        <div class="form-check form-check-inline">
+          <input id="undercondition_id_{{ undercondition.id }}" class="input_chk" type="checkbox" name="路下条件" value="{{ undercondition.id }}">
+          <label class="surround_label" for="undercondition_id_{{ undercondition.id }}">{{ undercondition.路下条件 }}</label>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_特記事項" class="col-sm-2 col-form-label">{{ form.特記事項.label }}</label>
+      <div class="col-sm-10">
+        {{ form.特記事項 }}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_カテゴリー" class="col-sm-2 col-form-label">{{ form.カテゴリー.label }}</label>
+      <div class="col-sm-10">
+        {{ form.カテゴリー }}
+      </div>
+    </div>
+    
+  <!-- Google Maps表示用のdiv -->
+  <div id="map" style="height: 400px; width: 100%;"></div>
+
+  <!-- 緯度と経度と住所を表示する要素(result) -->
+  <div id="result"></div>
+  
+  <!-- Google Maps JavaScript APIの非同期読み込み -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD93KKf7lXAP6EXSCVRAm1y2tL7tQ48HAg&callback=initMap" async defer></script>
+
+  <!-- initMap関数の定義 -->
+  <script>
+    function initMap() {
+      var savedLat = parseFloat(localStorage.getItem('latitude')) || 35.6812; // 指定がなければ東京駅
+      var savedLng = parseFloat(localStorage.getItem('longitude')) || 139.7670; // 指定がなければ東京駅
+
+      // iframeのsrc属性を更新
+      var iframeUrl = `https://www.mlit.go.jp/road/ir/ir-data/census_visualizationR3/webmap.html#16/${savedLat}/${savedLng}`;
+      document.getElementById('mapFrame').src = iframeUrl;
+      var map = new google.maps.Map(document.getElementById('map'), {
+        center: {lat: savedLat, lng: savedLng},// 中心を東京駅に設定
+        zoom: 12
+      });
+
+      // 1点の場合のマーカー
+      var marker = new google.maps.Marker({
+        position: {lat: savedLat, lng: savedLng}, // 保存された座標(指定がなければ東京駅)
+        map: map,
+        draggable: true
+      }); 
+      function updateFormFields(lat, lng, address) {
+        document.getElementById('latitudeField').value = lat;
+        document.getElementById('longitudeField').value = lng;
+        document.getElementById('result').innerHTML = '緯度: ' + lat + '<br>経度: ' + lng + '<br>住所: ' + address;
+      }
+
+      // マーカーのドラッグ終了時のイベントリスナー(1点)
+      google.maps.event.addListener(marker, 'dragend', function(event) {
+        var lat = event.latLng.lat();
+        var lng = event.latLng.lng();
+
+        // ローカルストレージに緯度経度を保存
+        localStorage.setItem('latitude', lat);
+        localStorage.setItem('longitude', lng);
+
+        document.getElementById('result').innerHTML = '緯度: ' + lat + '<br>経度: ' + lng;
+      });
+    
+      // マップをクリックした時のイベントリスナー
+      google.maps.event.addListener(map, 'click', function(event) {
+        // クリックされた位置にマーカーを移動
+        marker.setPosition(event.latLng);
+
+        // クリックされた位置の緯度経度を取得
+        var lat = event.latLng.lat();
+        var lng = event.latLng.lng();
+
+        // ローカルストレージに緯度経度を保存
+        localStorage.setItem('latitude', lat);
+        localStorage.setItem('longitude', lng);
+
+        // 逆ジオコーディングを行う関数
+        function geocodeLatLng(lat, lng) {
+          var geocoder = new google.maps.Geocoder();
+          var latlng = {lat: parseFloat(lat), lng: parseFloat(lng)};
+        
+          geocoder.geocode({ 'location': latlng }, function(results, status) {
+            if (status === 'OK') {
+              if (results[0]) {
+                var formattedAddress = results[0].formatted_address;
+                // 地図のURLを更新
+                var iframeUrl = `https://www.mlit.go.jp/road/ir/ir-data/census_visualizationR3/webmap.html#16/${lat}/${lng}`;
+                document.getElementById('mapFrame').src = iframeUrl;
+        
+                // 地図の位置情報を表示
+                document.getElementById('result').innerHTML = '緯度: ' + lat + '<br>経度: ' + lng + '<br>住所: ' + formattedAddress;
+              } else {
+                window.alert('No results found');
+              }
+            } else {
+              window.alert('Geocoder failed due to: ' + status);
+            }
+          });
+        }
+
+        // 逆ジオコーディング関数呼び出し
+        geocodeLatLng(lat, lng);
+      });
+    }
+  </script>
+  <div class="map-container">
+    <iframe id="mapFrame" src="https://www.mlit.go.jp/road/ir/ir-data/census_visualizationR3/webmap.html#13/${lat}/${lng}" width="1110" height="350"></iframe>  
+  </div>
+  <!--<iframe src="https://www.mlit.go.jp/road/ir/ir-data/census_visualizationR3/index.html#13/35.6823/139.7550" width="1000" height="300"></iframe>-->
+    <h5>国土交通省:令和3年度道路交通センサス</h5>
+    <script>
+    function handleOrderChange() {
+                // プルダウンメニューが変更されたときの処理をここに追加
+                var orderSelect = document.getElementById("order_by");
+                var selectedValue = orderSelect.value;
+  
+                // 選択された値を使って何かしらの処理を行う（例：Ajaxでデータを取得するなど）
+                console.log("選択された値: ", selectedValue);
+            }
+    var sidebar = document.querySelector('.sidebar');
+    var sidebarToggle = document.querySelector('.sidebar-toggle');
+  
+    sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('open');
+            });
+            
+            function stickySidebar() {
+              var sidebar = document.querySelector('.sidebar');
+              var sidebarTop = sidebar.getBoundingClientRect().top;
+              var windowTop = window.pageYOffset || document.documentElement.scrollTop;
+            
+              if (windowTop > sidebarTop && windowTop > 0) {
+                sidebar.style.position = 'fixed';
+                // サイドバーの位置やスタイルを調整する必要がある場合は、適宜追加の処理を行ってください
+              } else {
+                // sidebar.style.position = 'static';
+                // サイドバーの位置やスタイルを調整する必要がある場合は、適宜追加の処理を行ってください
+              }
+            }
+            
+            // スクロールイベントを監視して、サイドバーの位置を動的に変更する
+            window.addEventListener('scroll', function() {
+              stickySidebar();
+            }); 
+    </script>
+
+    <div class="form-group row">
+      <label for="id_交通量" class="col-sm-2 col-form-label">{{ form.交通量.label }}</label>
+      <div class="col-sm-10">
+        {{ form.交通量 }}
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="id_大型車混入率" class="col-sm-2 col-form-label">{{ form.大型車混入率.label }}</label>
+      <div class="col-sm-10">
+        {{ form.大型車混入率 }}
+      </div>
+    </div>
+
+    <input type='submit' value='作成'>
+  </form>
+</div>
+{% endblock content %}

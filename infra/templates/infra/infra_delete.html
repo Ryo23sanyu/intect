@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+
+{% block title %}物件削除{% endblock title %}
+
+{% block content %}
+  <form method='POST'>
+    {% csrf_token %}
+    <input type='submit'>{{ object.title }}を削除する</button>
+  </form>
+{% endblock content %}

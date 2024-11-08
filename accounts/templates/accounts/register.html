@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}アカウント作成{% endblock title %}
+{% block h1 %}アカウント作成{% endblock %}
+
+{% block content %}
+  <style>
+    .account-form-group {
+      margin-bottom: 20px;
+    }
+    .account-form-group label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .account-form-group input {
+      width: 200px;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    .account-form-group button {
+      width: auto;
+      padding: 10px 20px;
+    }
+    .account-form .btn {
+      display: block;
+      margin: auto;
+    }
+    
+  </style>
+  <form method="post" class="p-4 m-4 bg-light border border-success rounded account-form-group">
+    {% csrf_token %}
+    <div class="account-form-group">
+      {{ form.username.label_tag }} {{ form.username }}
+    </div>
+    <div class="account-form-group">
+      {{ form.first_name.label_tag }} {{ form.first_name }}
+    </div>
+    <div class="account-form-group">
+      {{ form.last_name.label_tag }} {{ form.last_name }}
+    </div>
+    <div class="account-form-group">
+      {{ form.email.label_tag }} {{ form.email }}
+    </div>
+    <div class="account-form-group">
+      {{ form.company_name.label_tag }} {{ form.company_name }}
+    </div>
+    <div class="account-form-group">
+      {{ form.password1.label_tag }} {{ form.password1 }}
+    </div>
+    <div class="account-form-group">
+      {{ form.password2.label_tag }} {{ form.password2 }}
+    </div>
+    <button type="submit" class="btn btn-success m-2">アカウント作成</button>
+  </form>
+
+{% endblock content %}

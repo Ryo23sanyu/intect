@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}名前登録{% endblock title %}
+{% block h1 %}名前登録{% endblock %}
+
+{% block content %}
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+}
+.form-section {
+    margin-bottom: 20px;
+}
+.form-section label {
+    display: block;
+    margin-bottom: 5px;
+}
+.form-section input, .form-section select, .form-number-section input, .form-number-section select {
+    width: 150px;
+    padding: 5px;
+    margin-bottom: 10px;
+}
+.form-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.form-number-section {
+    align-items: center;
+    gap: 10px;
+}
+.inline-group {
+    display: flex;
+    align-items: center;
+    gap: 15px; /* フレックスアイテム間の空間 */
+    margin-bottom: 10px;
+}
+.form-section .inline-group label {
+    margin: 0;
+}
+.form-section .inline-group input, .form-section, .form-number-section .inline-group select {
+    margin: 0 10px;
+}
+button.toggle-button {
+    margin: 0 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+    background-color: #ddd;
+    border: none;
+    border-radius: 5px;
+}
+button.toggle-button.selected {
+    background-color: #007bff;
+    color: white;
+}
+.form-number-section .entries .entry {
+    display: inline-block;
+    margin-right: 10px;
+    white-space: nowrap;
+    gap: 10px; /* エントリ間の間隔を整える */
+}
+button {
+    margin-top: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+</style>
+
+{# PartsNumber を保存するためにformで囲う #}
+    <form action="" method="post">
+        {% csrf_token %}
+
+        <div class="form-number-section">
+            <label>名前とアルファベットの紐付け:</label>
+            <button type="button" onclick="addSerialEntry()">追加</button>
+            <div id="name-entries" class="entries">
+                <div class="entry">
+                    <input type="name" placeholder="名前" name="name_alphabet"> : <input type="alphabet" placeholder="アルファベット" min="1" name="name_alphabet">
+                </div>
+            </div>
+        </div>
+
+        <input type="submit" value="登録">
+    </form>
+
+    </br>
+    <h2>現在の登録一覧</h2>
+    <ul>
+    {% for entry in name_entries %}
+        <li>
+            {{ entry.name }} ({{ entry.alphabet }})
+            <form action="{% url 'delete_name_entry' entry.id %}" method="post" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit">削除</button>
+            </form>
+        </li>
+    {% empty %}
+        <p>登録されている名前がありません。</p>
+    {% endfor %}
+    </ul>
+
+<script>
+    // 追加ボタンで表示される入力フォーム
+    function addSerialEntry() {
+        const container = document.getElementById('name-entries');
+        const entryDiv = document.createElement('div');
+        entryDiv.classList.add('entry');
+        entryDiv.innerHTML = `<input type="name" placeholder="名前" name="name_alphabet"> : <input type="alphabet" placeholder="アルファベット" name="name_alphabet">`;
+        container.appendChild(entryDiv);
+    }
+</script>
+{% endblock %}
