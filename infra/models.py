@@ -304,6 +304,8 @@ class DamageComment(models.Model):
             self.number = 23
         elif '土砂詰まり' in self.damage_name:
             self.number = 24
+        elif 'NON' in self.damage_name:
+            self.number = 27
         else:
             self.number = 17
         # get_combined_textメソッドで生成されたテキストをauto_commentフィールドに代入

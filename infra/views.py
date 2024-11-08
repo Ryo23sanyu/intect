@@ -1,17 +1,19 @@
 from collections import defaultdict
-import copy
+from copy import copy
 import datetime
 import fnmatch
 from io import BytesIO
+import io
 from itertools import groupby
 import math
 from operator import attrgetter
-import os
 import re
 import tempfile
 from urllib.parse import unquote
 import boto3
+from django.conf import settings
 from django.db import IntegrityError
+from django.db.models import Count
 from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -23,6 +25,7 @@ import urllib
 import openpyxl
 from openpyxl.drawing.image import Image as OpenpyxlImage
 from PIL import Image as PILImage
+import requests
 
 from infra.tasks import create_picturelist
 
@@ -1369,10 +1372,16 @@ def upload_picture(request, article_pk, pk):
         print(f"bridge：{bridge}")
         
         if action == 'change':
+            print(bridge.this_time_picture)
+            
             old_picture_path = request.POST.get('oldPicturePath')
             new_picture_path = handle_uploaded_file(request.FILES['file'])
+            # もし、↑と↓のprint文で変わらないのであれば、このreplaceに問題がある。
             bridge.this_time_picture = bridge.this_time_picture.replace(old_picture_path, new_picture_path)
-            bridge.save()
+            
+            new_bridge = bridge.save()
+            print(new_bridge.this_time_picture)
+            
             print("変更する動作")
             print(f"old_picture_path：{old_picture_path}")
             print(f"new_picture_path：{new_picture_path}")
@@ -1501,21 +1510,21 @@ def observations_list(request, article_pk, pk):
         '㉕': '沈下・移動・傾斜',
         '㉖': '洗掘',
     }
-    
-    lank_order = ['a', 'b', 'c', 'd', 'e']  # ランクの順序をリストで定義
-    def get_lank_value(damage_name):
-        """damage_nameのランク部分を取得する"""
-        if "-" in damage_name:
-            return damage_name.split('-')[-1]
-        return None
-    
+
+    # lank_order = ['a', 'b', 'c', 'd', 'e']  # ランクの順序をリストで定義
+    # def get_lank_value(damage_name):
+    #     """damage_nameのランク部分を取得する"""
+    #     if "-" in damage_name:
+    #         return damage_name.split('-')[-1]
+    #     return None
+
     # FullReportDataの準備
     damage_comments = defaultdict(lambda: {'damage_lanks': [], 'this_time_pictures': []})
 
     for part in parts_data:
         part_full_name = f"{part.parts_name} {part.symbol}{part.number}"
         span_number = part.span_number + '径間'
-        print(f"partデータのarticle：{part.article}")
+        print(f"partデータ：{part}")
 
         # FullReportDataから該当するデータを取得
         report_data_list = FullReportData.objects.filter(
@@ -1523,55 +1532,89 @@ def observations_list(request, article_pk, pk):
             span_number=span_number, # FullReportDataのspan_numberオブジェクトがspan_number(1径間)と同じ、かつ
             infra=part.infra, # FullReportDataのinfraオブジェクトがpart.infraと同じ場合
             article=part.article
-        )  
+        )
 
-        for report_data in report_data_list:
-            print(f"report_data_list:{report_data.damage_name}")
-            print(f"picture:{report_data.this_time_picture}")
+        # 条件に満たすデータが存在するかチェック
+        if report_data_list.exists():
+            for report_data in report_data_list:
+                print(f"report_data:{report_data}")
+                # print(f"picture:{report_data.this_time_picture}")
 
-            damage_list_material = "" # 空のdamage_list_materialを用意
-            for m in part.material.all(): # part.materialの全データを取得し「m」変数に入れる
-                damage_list_material += m.材料 + "," # 「m」の材料フィールドを指定してdamage_list_materialに入れる
+                damage_list_material = "" # 空のdamage_list_materialを用意
+                for m in part.material.all(): # part.materialの全データを取得し「m」変数に入れる
+                    damage_list_material += m.材料 + "," # 「m」の材料フィールドを指定してdamage_list_materialに入れる
+                    
+                elements = damage_list_material.split(',')
+                replaced_elements = [material_replace_map.get(element, element) for element in elements] # それぞれの要素を置換辞書に基づいて変換します
+                damage_list_materials = ','.join(replaced_elements) # カンマで結合
                 
-            elements = damage_list_material.split(',')
+                damage_name = report_data.damage_name.split('-')[0] if '-' in report_data.damage_name else report_data.damage_name
+                if damage_name == "NON":
+                    damage_name = damage_name
+                elif damage_name[0] != '⑰':
+                    damage_name = number_change[damage_name[0]]
+                else:
+                    damage_name = damage_name[1:] # ⑦剥離・鉄筋露出から先頭の一文字を省く
+
+                damage_lank = report_data.damage_name.split('-')[1] if '-' in report_data.damage_name else report_data.damage_name
+                
+                # DamageListに必要なフィールドを含むインスタンスを作成
+                # << 損傷一覧(Excel)用データ登録 >>
+                damage_list_entry = DamageList(
+                    parts_name = part.parts_name, # 主桁
+                    symbol = part.symbol, # Mg
+                    number = part.number, # 0101
+                    material = damage_list_materials[:-1], # 最後のコンマが不要なため[-1:]（S,C）
+                    main_parts = "〇" if part.main_frame else "", # 主要部材のフラグ
+                    damage_name = damage_name, # 剥離・鉄筋露出
+                    damage_lank = damage_lank, # d
+                    span_number = part.span_number,
+                    infra = part.infra,
+                    article = part.article
+                )
+                
+                try:
+                    # DamageListインスタンスを保存
+                    damage_list_entry.save()
+                    
+                except IntegrityError:
+                    # 重複データがある場合の処理
+                    print("保存しませんでした。")
+                    # 必要に応じてログを記録したり、他の処理を追加したりできます
+                    # continue  # 次のループに進む
+        else:
+            material_text = ""
+            for m in part.material.all():
+                material_text += m.材料 + ","
+                
+            elements = material_text.split(',')
             replaced_elements = [material_replace_map.get(element, element) for element in elements] # それぞれの要素を置換辞書に基づいて変換します
-            damage_list_materials = ','.join(replaced_elements) # カンマで結合します。
+            damage_list_materials = ','.join(replaced_elements) # カンマで結合
             
-            damage_name = report_data.damage_name.split('-')[0] if '-' in report_data.damage_name else report_data.damage_name
-            if damage_name == "NON":
-                damage_name = damage_name
-            elif damage_name[0] != '⑰':
-                damage_name = number_change[damage_name[0]]
-            else:
-                damage_name = damage_name[1:] # ⑦剥離・鉄筋露出から先頭の一文字を省く
-                
-            damage_lank = report_data.damage_name.split('-')[1] if '-' in report_data.damage_name else report_data.damage_name
-            
-            # DamageListに必要なフィールドを含むインスタンスを作成
-            # << 損傷一覧(Excel)用データ登録 >>
-            damage_list_entry = DamageList(
+            # FullReportDataに該当がないパーツも新しいモデルに登録
+            no_damage_parts_number = DamageList(
                 parts_name = part.parts_name, # 主桁
                 symbol = part.symbol, # Mg
                 number = part.number, # 0101
                 material = damage_list_materials[:-1], # 最後のコンマが不要なため[-1:]（S,C）
                 main_parts = "〇" if part.main_frame else "", # 主要部材のフラグ
-                damage_name = damage_name, # 剥離・鉄筋露出
-                damage_lank = damage_lank, # d
+                damage_name = "NON", # 剥離・鉄筋露出
+                damage_lank = "a", # d
                 span_number = part.span_number,
                 infra = part.infra,
                 article = part.article
             )
-
+            
             try:
                 # DamageListインスタンスを保存
-                damage_list_entry.save()
+                no_damage_parts_number.save()
                 
             except IntegrityError:
                 # 重複データがある場合の処理
-                print("データが存在しています。")
+                print("保存しませんでした。")
                 # 必要に応じてログを記録したり、他の処理を追加したりできます
                 # continue  # 次のループに進む
-            
+                    
     """所見用のクラス登録"""
     damage_comments = defaultdict(lambda: {'damage_lanks': [], 'this_time_pictures': []})
 
@@ -1585,14 +1628,70 @@ def observations_list(request, article_pk, pk):
             infra=part.infra,
             article=part.article
         )
+        
+        main_parts_list_left = ["主桁", "PC定着部"]
+        main_parts_list_right = ["横桁", "橋台"]
+        main_parts_list_zero = ["床版"]
+        
+        if report_data_list.exists():
+            for report_data in report_data_list:
 
-        for report_data in report_data_list:
-            main_parts_list_left = ["主桁", "PC定着部"]
-            main_parts_list_right = ["横桁", "橋台"]
-            main_parts_list_zero = ["床版"]
+                parts_name = f"{part.parts_name} {part.number}"
+                
+                # ルールに則り、部材番号を作成
+                if any(word in parts_name for word in main_parts_list_left): # main_parts_list_leftリストと一致した場合
+                    left = parts_name.find(" ")
+                    number2 = parts_name[left+1:]
+                    number_part = re.search(r'[A-Za-z]*(\d+)', number2).group(1)
+                    result_parts_name = parts_name[:left] + " " + number_part[:2]
+                elif any(word in parts_name for word in main_parts_list_right): # main_parts_list_rightリストと一致した場合
+                    right = parts_name.find(" ")
+                    number2 = parts_name[right+1:]
+                    number_part = re.search(r'[A-Za-z]*(\d+)', number2).group(1)
+                    result_parts_name = parts_name[:right] + " " + number_part[2:] if len(number_part) < 5 else number_part[2:]
+                elif any(word in parts_name for word in main_parts_list_zero): # main_parts_list_zeroリストと一致した場合
+                    right = parts_name.find(" ")
+                    result_parts_name = parts_name[:right] + " 00"
+                else:
+                    right = parts_name.find(" ")
+                    result_parts_name = parts_name[:right]
 
+                damage_name = report_data.damage_name.split('-')[0] if '-' in report_data.damage_name else report_data.damage_name
+                if damage_name == "NON":
+                    damage_name = damage_name
+                elif damage_name[0] != '⑰':
+                    damage_name = number_change[damage_name[0]]
+                else:
+                    damage_name = damage_name[1:] 
+                damage_lank = report_data.damage_name.split('-')[1] if '-' in report_data.damage_name else report_data.damage_name
+                    
+                    
+                # 部材名と損傷名の組み合わせでデータを作成
+                damage_comments[(result_parts_name, damage_name)]['damage_lanks'].append(damage_lank)
+                damage_comments[(result_parts_name, damage_name)]['this_time_pictures'].append(report_data.this_time_picture)
+                
+                damage_comment_material = ""
+                for m in part.material.all():
+                    damage_comment_material += m.材料 + ","
+                elements = damage_comment_material.split(',')
+                replaced_elements = [material_replace_map.get(element, element) for element in elements]
+                damage_comment_materials = ','.join(replaced_elements)
+                print(f"replaced_elements:{replaced_elements}")
+                print(f"damage_comment_materials:{damage_comment_materials}")
+
+                damage_comments[(result_parts_name, damage_name)]['material'] = damage_comment_materials[:-1]
+                damage_comments[(result_parts_name, damage_name)]['main_parts'] = "〇" if part.main_frame else ""
+                damage_comments[(result_parts_name, damage_name)]['span_number'] = part.span_number
+                damage_comments[(result_parts_name, damage_name)]['infra'] = part.infra
+                damage_comments[(result_parts_name, damage_name)]['article'] = part.article
+                
+        else:
+            damage_name = "NON"
+            damage_lank = "a"
+            
             parts_name = f"{part.parts_name} {part.number}"
-
+            
+            # ルールに則り、部材番号を作成
             if any(word in parts_name for word in main_parts_list_left): # main_parts_list_leftリストと一致した場合
                 left = parts_name.find(" ")
                 number2 = parts_name[left+1:]
@@ -1610,17 +1709,12 @@ def observations_list(request, article_pk, pk):
                 right = parts_name.find(" ")
                 result_parts_name = parts_name[:right]
 
-            damage_name = report_data.damage_name.split('-')[0] if '-' in report_data.damage_name else report_data.damage_name
-            if damage_name == "NON":
-                damage_name = damage_name
-            elif damage_name[0] != '⑰':
-                damage_name = number_change[damage_name[0]]
-            else:
-                damage_name = damage_name[1:] 
-            damage_lank = report_data.damage_name.split('-')[1] if '-' in report_data.damage_name else report_data.damage_name    
+                
             # 部材名と損傷名の組み合わせでデータを作成
             damage_comments[(result_parts_name, damage_name)]['damage_lanks'].append(damage_lank)
             damage_comments[(result_parts_name, damage_name)]['this_time_pictures'].append(report_data.this_time_picture)
+            
+            
             
             damage_comment_material = ""
             for m in part.material.all():
@@ -1636,7 +1730,7 @@ def observations_list(request, article_pk, pk):
             damage_comments[(result_parts_name, damage_name)]['span_number'] = part.span_number
             damage_comments[(result_parts_name, damage_name)]['infra'] = part.infra
             damage_comments[(result_parts_name, damage_name)]['article'] = part.article
-
+            
     for (result_parts_name, damage_name), data in damage_comments.items():
         print("1571行目")
         damage_lanks = data['damage_lanks']
@@ -1653,6 +1747,10 @@ def observations_list(request, article_pk, pk):
         print(f"before_combined_pictures：{before_combined_pictures}")
 
         # << 管理サイトに登録するコード（所見） >>
+        print(f"result_parts_name：{result_parts_name}")
+        print(f"damage_name：{damage_name}")
+        print(f"damage_max_lank：{damage_max_lank}")
+        print(f"damage_min_lank：{damage_min_lank}")
         try:
             damage_comment_entry, created = DamageComment.objects.get_or_create(
                 parts_name=result_parts_name,
@@ -1670,8 +1768,8 @@ def observations_list(request, article_pk, pk):
             )
             if not created:
                 # 既存データが見つかった場合には、フィールド値を更新
-                damage_comment_entry.material = data['material']
-                damage_comment_entry.main_parts = data['main_parts']
+                damage_comment_entry.material = data['material']# 材料
+                damage_comment_entry.main_parts = data['main_parts']# 主要部材
                 damage_comment_entry.damage_max_lank = damage_max_lank
                 damage_comment_entry.damage_min_lank = damage_min_lank
                 damage_comment_entry.this_time_picture = before_combined_pictures
@@ -1691,15 +1789,15 @@ def observations_list(request, article_pk, pk):
             article=data['article']
         )
 
-        images = []        
-        def remove_unwanted_prefix(text):
-            # 「https:/」を探して、それ以前の部分を削除する
-            parts = text.split('https:/', 1)
-            if len(parts) > 1:
-                return 'https:/' + parts[1]
-            else:
-                return None
-
+        # def remove_unwanted_prefix(text):
+        #     # 「https:/」を探して、それ以前の部分を削除する
+        #     parts = text.split('https:/', 1)
+        #     if len(parts) > 1:
+        #         return 'https:/' + parts[1]
+        #     else:
+        #         return None
+        
+        images = []
         for picture in bridge_pictures:
             decoded_url = unquote(picture.image.url)
             print(f"写真パス：{decoded_url}")
@@ -1708,9 +1806,6 @@ def observations_list(request, article_pk, pk):
             print(picture)
 
         damage_comment_entry.images = images
-           
-    # span_numberの順かつ、replace_nameの順かつ、parts_numberの順かつ、numberの順に並び替え 
-    sorted_data = DamageComment.objects.filter(infra=pk).order_by('span_number', 'replace_name', 'parts_number', 'number')
     
     if "search_title_text" in request.GET:
         search_title_text = request.GET["search_title_text"]
@@ -1721,6 +1816,37 @@ def observations_list(request, article_pk, pk):
     span_create_number = search_title_text.replace("径間", "")
     print(span_create_number)
     filtered_bridges = DamageComment.objects.filter(infra=pk, span_number=span_create_number).order_by('span_number', 'replace_name', 'parts_number', 'number')
+    # まず、重複しているデータを特定します。
+    duplicates = DamageComment.objects.values(
+        'infra', 'span_number', 'replace_name', 'parts_number'
+    ).annotate(
+        count=Count('id')
+    ).filter(
+        count__gt=1
+    )
+
+    # 各重複データについて、numberが27のものを削除します。
+    for duplicate in duplicates:
+        infra = duplicate['infra']
+        span_number = duplicate['span_number']
+        replace_name = duplicate['replace_name']
+        parts_number = duplicate['parts_number']
+
+        # 重複データのうち、numberが27のものをフィルタリング
+        target_comments = DamageComment.objects.filter(
+            infra=infra,
+            span_number=span_number,
+            replace_name=replace_name,
+            parts_number=parts_number,
+            number=27
+        )
+
+        # 存在する場合は削除
+        if target_comments.exists():
+            target_comments.delete()
+            print(f"Deleted duplicate comments with number 27 for infra={infra}, span_number={span_number}.")
+
+    # 並び替え時に「部材が重複」かつ「numberが27(NON)」の場合、そのデータを削除
     print(f"bridges:{filtered_bridges}")
     buttons_count = int(table.infra.径間数) # 数値として扱う
     buttons = list(range(1, buttons_count + 1)) # For loopのためのリストを作成
@@ -1766,7 +1892,7 @@ def observations_list(request, article_pk, pk):
         images_url.append({"full_report": observer_data, "matches": matches, "match_details": match_details})
         
     context = {'object': observer_object, 'article_pk': article_pk, 'data': filtered_bridges, 'article_pk': article_pk, 'pk': pk, 'buttons': buttons, 'images': images_url}
-    print(f"所見用context：{context}")
+    # print(f"所見用context：{context}")
     return render(request, 'infra/observer_list.html', context)
 
 
@@ -1837,16 +1963,15 @@ def custom_sort_key(record):
 # << 管理サイトに登録したデータをエクセルに出力 >>
 def excel_output(request, article_pk, pk):
     bridge_name = ""
-    
-    from django.conf import settings
-    print("ファイル名")
-    bucket_name = settings.AWS_STORAGE_BUCKET_NAME
-    print(bucket_name)
-    # 元のファイルのパス（例: `base.xlsm`）
-    original_file_path = settings.H31_BRIDGE_EXCEL
+
+    bucket_name = 'infraprotect'
+    original_file_path = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/H31_bridge_base.xlsm"
     print(f"エクセルひな形のURL：{original_file_path}")
     # エクセルファイルを読み込む
-    wb = openpyxl.load_workbook(original_file_path, keep_vba=True)
+    s3 = boto3.client('s3')
+    response = s3.get_object(Bucket=bucket_name, Key="H31_bridge_base.xlsm")
+    file_stream = BytesIO(response['Body'].read())
+    wb = openpyxl.load_workbook(file_stream, keep_vba=True)
     print("読み取り")
     # << Django管理サイトからデータを取得（その１用） >>
     no01_records = Infra.objects.filter(id=pk, article=article_pk)
@@ -2082,6 +2207,7 @@ def excel_output(request, article_pk, pk):
     for picture in damage_picture_data:
         key = (picture.damage_coordinate_x, picture.damage_coordinate_y, picture.table, picture.infra, picture.article)
         matching_records = full_report_dict.get(key) # キー一致のレコードを取得
+        print(picture.image)
         
         if matching_records:
             print("チェック")
@@ -2091,13 +2217,13 @@ def excel_output(request, article_pk, pk):
                     'damage_name': record.damage_name,
                     'span_number': record.span_number,
                     'textarea_content': record.textarea_content,
-                    'image': picture.image.url,
+                    'image': picture.image,
                     'picture_number': picture.picture_number
                 }
                 # imageが空でない場合にのみ追加
                 if combined_result['image']:
                     joined_results.append(combined_result) # 管理サイトにデータが格納されているか確認
-    print(f"ここは合体したデータ{len(joined_results)}個：{joined_results}")            
+    # print(f"ここは合体したデータ{len(joined_results)}個：{joined_results}")            
 
     i10 = 0
     unique_combinations = set()
@@ -2196,15 +2322,23 @@ def excel_output(request, article_pk, pk):
                 # 写真の有無を判断
             try:
                 image_path = record['image'] # ImageFieldの場合は.pathをつける
+                print(image_path)
             except AttributeError:
                 print(f"エントリに 'this_time_picture' が存在しないか、無効です")
                 continue  # このエントリをスキップ
             
-            image_path = os.path.join(settings.BASE_DIR, record['image'].lstrip('/')) # フルパスに変更
-            print(f"Calculated image path: {image_path}") 
+            # image_path = os.path.join(settings.BASE_DIR, record['image'].lstrip('/')) # フルパスに変更
+            # print(f"Calculated image path: {image_path}") 
             
-            if os.path.exists(image_path):
-                pil_img = PILImage.open(image_path)
+            # TODO：openpyxlはローカル写真の貼付けのみ、S3バケットの写真をDLせず貼付けることは不可能
+            # 画像をS3からダウンロードしてメモリ上に保存
+            try:
+                response = requests.get(image_path) # 指定したURLから画像データを取得
+                response.raise_for_status()  # リクエストが成功したか確認(失敗したら例外処理となる)
+
+                image_data = response.content
+                pil_img = PILImage.open(io.BytesIO(image_data))
+                
                 width, height = pil_img.size
                 aspect_ratio = width / height
 
@@ -2215,21 +2349,19 @@ def excel_output(request, article_pk, pk):
                     new_height = min(height, max_height)
                     new_width = new_height * aspect_ratio
 
-                resized_img = pil_img.resize((int(new_width), int(new_height)))            
-                # 一時ファイル用のテンポラリディレクトリを作成
+                resized_img = pil_img.resize((int(new_width), int(new_height)))
+                
+                # 画像を一時ファイルとして保存
                 with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
-                    resized_img_path = tmp.name
-                # 画像を一時ファイルに保存
-                resized_img.save(resized_img_path)
-                # openpyxl用の画像オブジェクトを作成
-                img = OpenpyxlImage(resized_img_path)
-                # セルの位置に画像を貼り付け
+                    resized_img_path = tmp.name# 写真のリサイズ
+                    resized_img.save(resized_img_path)# 一時ファイルに保存
+                    img = OpenpyxlImage(resized_img_path)
+
                 img.anchor = ws[join_picture_cell[i10]].coordinate
                 ws.add_image(img)
-            else:
-                print("写真貼付けエラー")
-                # ws[join_picture_cell[i10]] = record.this_time_picture # 損傷写真
-                # 関数を使用する場合は関数と同じ変数を渡す(関数化に必要なデータ：3つ目　使うデータ)
+                
+            except requests.exceptions.RequestException as e:
+                print(f"写真貼付けエラー: {e}")
                 
             ws[join_damage_memo_cell[i10]] = record['textarea_content'] # メモ
             print(record['textarea_content'])
@@ -2270,7 +2402,7 @@ def excel_output(request, article_pk, pk):
             ws[f'BE{row}'] = record.classification # 分類「1」
             ws[f'AO{row}'] = record.pattern # パターン「6」
             ws[f'BL{row}'] = record.span_number # 径間番号
-    
+
     # 現在の日時を取得してファイル名に追加
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     # 新しいファイル名の生成
