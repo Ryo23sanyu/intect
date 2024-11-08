@@ -113,7 +113,7 @@
         <li>✕損傷図</a></li>{# その9 #}
         <li><a href="{% url 'bridge-table' object.article.pk object.pk %}">損傷写真</a></li>{# その10 #}
         {% comment %} <li><a href="{% url 'file-upload' object.article.pk object.pk %}">アップロード</a></li> {% endcomment %}
-        {% comment %} <li><a id="excel_download" href="{% url 'excel-output' object.article.pk object.pk %}">エクセル出力</a></li> {% endcomment %}
+        <li><a id="excel_download" href="{% url 'excel-output' object.article.pk object.pk %}">エクセル出力</a></li>
         {# <li><a id="dxf_download" href="{% if table.dxf %}{{ table.dxf.url }}{% endif %}">dxfデータ出力</a></li> #}
         {% comment %} <li><a id="dxf_download" href="{% url 'dxf-output' object.article.pk object.pk %}">dxfデータ出力</a></li> {% endcomment %}
         {# ↓をクリックした時、↑2つをクリックしたことにするJavaScriptを用意する。(dxfファイルが無い場合、このボタンは機能しない。) #}

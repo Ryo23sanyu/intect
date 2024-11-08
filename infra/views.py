@@ -1,22 +1,28 @@
 from collections import defaultdict
+import copy
+import datetime
 import fnmatch
-from functools import reduce
+from io import BytesIO
 from itertools import groupby
+import math
 from operator import attrgetter
 import os
-from pathlib import Path
 import re
+import tempfile
 from urllib.parse import unquote
 import boto3
 from django.db import IntegrityError
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, DetailView, CreateView, DeleteView, UpdateView
 from django.views import View
-import ezdxf
 import urllib
+
+import openpyxl
+from openpyxl.drawing.image import Image as OpenpyxlImage
+from PIL import Image as PILImage
 
 from infra.tasks import create_picturelist
 
@@ -1819,4 +1825,461 @@ def damage_comment_cause_edit(request, pk):
 
         return redirect("observations-list", damage_comment_cause.infra.article.id, damage_comment_cause.infra.id )
     
+    
+# << エクセル出力時に並び替えを行う >>
+parts_name_priority_list = ['主桁', '横桁', '床版']
+# カスタムソートキー関数（エクセル出力時に使用）
+def custom_sort_key(record):
+    # parts_nameリストの優先度を求めるためのインデックス
+    parts_name_priority = next((i for i, part in enumerate(parts_name_priority_list) if part in record.parts_name), len(parts_name_priority_list))
+    return (int(record.span_number), parts_name_priority)
+
 # << 管理サイトに登録したデータをエクセルに出力 >>
+def excel_output(request, article_pk, pk):
+    bridge_name = ""
+    
+    from django.conf import settings
+    print("ファイル名")
+    bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+    print(bucket_name)
+    # 元のファイルのパス（例: `base.xlsm`）
+    original_file_path = settings.H31_BRIDGE_EXCEL
+    print(f"エクセルひな形のURL：{original_file_path}")
+    # エクセルファイルを読み込む
+    wb = openpyxl.load_workbook(original_file_path, keep_vba=True)
+    print("読み取り")
+    # << Django管理サイトからデータを取得（その１用） >>
+    no01_records = Infra.objects.filter(id=pk, article=article_pk)
+    ws = wb['その１']
+    for record in no01_records:
+        bridge_name = record.title
+        print(bridge_name)
+        ws[f'F6'] = record.title # 〇〇橋
+        ws[f'O10'] = record.橋長
+        ws[f'BC5'] = record.橋梁コード
+        ws[f'BF11'] = record.交通量
+        ws[f'BF13'] = record.大型車混入率
+        # 活荷重を処理
+        load_weights = ', '.join([str(weight) for weight in record.活荷重.all()])
+        ws['X10'] = load_weights
+        # 等級を処理
+        load_grades = ', '.join([str(grade) for grade in record.等級.all()])
+        ws['AD10'] = load_grades
+        # 適用示方書を処理
+        rulebooks = ', '.join([str(rulebook) for rulebook in record.適用示方書.all()])
+        ws['AK10'] = rulebooks
+
+    # << Django管理サイトからデータを取得（その７、８用） >>
+    no0708_records = DamageComment.objects.filter(infra=pk, article=article_pk)
+    # 並び替えて出力
+    sorted_records = sorted(no0708_records, key=custom_sort_key)
+    # カウンタ変数をシートごとに用意
+    span = 1
+    i07, i08 = 0, 0
+    initial_row07, initial_row08= 13, 13 # 1つ目の入力位置
+    
+    for record in sorted_records:
+        print(f"出力レコード:{record}")
+        print(f"　径間:{span}")
+        if int(record.span_number) == span + 1:
+            span = int(record.span_number)
+            initial_row07 = initial_row07 + 8 * math.ceil(i07 / 8) # 13+8×(ページ数)
+            initial_row08 = initial_row08 + 8 * math.ceil(i08 / 8) # 13,21,29(+8)
+            i07, i08 = 0, 0
+        if int(record.span_number) == span:
+            if record.main_parts == "〇":
+                ws = wb['その７']
+                row = initial_row07 + i07 # 行は13から
+                i07 += 1
+            else:
+                ws = wb['その８']
+                row = initial_row08 + i08 # 行は13から
+                i08 += 1
+            print(f"　エクセル出力:{record.comment_parts_name}{record.parts_number}{record.damage_name}{record.jadgement}")
+            ws[f'F{row}'] = record.comment_parts_name # 主桁
+            ws[f'J{row}'] = record.parts_number # 01
+            ws[f'D{row}'] = record.material # S,C
+            ws[f'L{row}'] = record.damage_max_lank # e
+            ws[f'N{row}'] = record.damage_min_lank # b
+            ws[f'BO{row}'] = record.span_number # 径間番号
+            
+            if record.damage_name != "NON":
+                if record.jadgement == "C1":
+                    jadgement_position = f'S{row}'
+                elif record.jadgement == "C2":
+                    jadgement_position = f'V{row}'
+                elif record.jadgement == "M":
+                    jadgement_position = f'Z{row}'
+                elif record.jadgement == "E1":
+                    jadgement_position = f'AD{row}'
+                elif record.jadgement == "E2":
+                    jadgement_position = f'AH{row}'
+                elif record.jadgement == "S1":
+                    jadgement_position = f'AK{row}'
+                elif record.jadgement == "S2":
+                    jadgement_position = f'AN{row}'
+                else:                  # "B"
+                    jadgement_position = f'P{row}'
+            
+                ws[jadgement_position] = record.damage_name # 腐食
+                ws[f'AU{row}'] = record.cause # 損傷原因「経年変化」  
+                print(f"初見コメント：{record.comment}")
+            
+                if record.comment != None:
+                    choice_comment = record.comment
+                else:
+                    choice_comment = record.auto_comment
+                
+                ws[f'BC{row}'] = choice_comment # 〇〇が見られる。
+            else:
+                ws[f'BC{row}'] = "健全である。"
+
+    # << （その１０） >>
+    no10_records = FullReportData.objects.filter(infra=pk, article=article_pk, this_time_picture__isnull=False).exclude(this_time_picture='')
+    #                                                                          this_time_fieldがnull(空)=でない 除外する(this_time_picture='')
+    ws = wb['その１０']
+    print(f"最大径間数：{span}")
+    print(f"最大径間数：{int(span)}")
+    # << セル位置を作成 >>
+    picture_and_spannumber_row = 9 # 部材名・要素番号
+    partsname_and_number_row = 10 # 部材名・要素番号
+    damagename_and_lank_row = 11 # 損傷の種類・損傷程度
+    picture_start_row = 13 # 損傷写真
+    lasttime_lank_row = 15 # 前回損傷程度
+    damage_memo_row = 17 # 損傷メモ
+    step = 14
+    output_data = len(no10_records)
+    num_positions = math.ceil(output_data/3) + int(span) * 6 # 横3列で割って何行になるか
+    
+    # 関連する列を定義
+    picture_columns = ["E", "AE", "BE"] # 写真列
+    left_columns = ["I", "AI", "BI"] # 左列
+    right_columns = ["R", "AR", "BR"] # 右列
+    bottom_columns = ["T", "AT", "BT"] # 前回程度+メモ
+    # セル位置のリストを生成
+    join_picturenumber_cell = [f"{col}{picture_and_spannumber_row + i * step}" for i in range(num_positions) for col in left_columns] # 写真番号
+    join_spannumber_cell = [f"{col}{picture_and_spannumber_row + i * step}" for i in range(num_positions) for col in right_columns] # 径間番号
+    join_partsname_cell = [f"{col}{partsname_and_number_row + i * step}"    for i in range(num_positions) for col in left_columns] # 部材名
+    join_number_cell = [f"{col}{partsname_and_number_row + i * step}"       for i in range(num_positions) for col in right_columns] # 要素番号
+    join_damagename_cell = [f"{col}{damagename_and_lank_row + i * step}"    for i in range(num_positions) for col in left_columns] # 損傷の種類
+    join_lank_cell = [f"{col}{damagename_and_lank_row + i * step}"          for i in range(num_positions) for col in right_columns] # 損損傷程度
+    join_picture_cell = [f"{col}{picture_start_row + i * step}"             for i in range(num_positions) for col in picture_columns] # 損傷写真
+   #join_lasttime_lank_cell = [f"{col}{lasttime_lank_row + i * step}"       for i in range(num_positions) for col in bottom_columns] # 前回損傷程度
+    join_damage_memo_cell = [f"{col}{damage_memo_row + i * step}"           for i in range(num_positions) for col in bottom_columns] # 損傷メモ
+
+    span = 1
+    page_count = 1
+    i10 = 0
+    initial_row10 = 9 # 1つ目の入力位置
+    
+    def hide_sheet_copy_and_paste(wb, sheet_name):
+        """シートを再表示してコピーその後非表示に設定"""
+
+        hide_sheet = wb['ページ１０']
+        hide_sheet.sheet_state = 'visible'
+
+        # コピーする行の範囲を指定します
+        copy_start_row = 2
+        copy_end_row = 29
+
+        # コピーする行のデータとスタイルを保持するリストを作成します
+        rows_to_copy = []
+        merges_to_keep = []
+
+        for row_idx in range(copy_start_row, copy_end_row + 1):
+            row_data = []
+            for cell in hide_sheet[row_idx]:
+                cell_data = {
+                    'value': cell.value,
+                    'font': copy(cell.font),
+                    'border': copy(cell.border),
+                    'fill': copy(cell.fill),
+                    'number_format': cell.number_format,
+                    'protection': copy(cell.protection),
+                    'alignment': copy(cell.alignment)
+                }
+                row_data.append(cell_data)
+            row_data.append(hide_sheet.row_dimensions[row_idx].height)
+            rows_to_copy.append(row_data)
+
+        # 元のシートのセル結合情報を取得
+        for merge in hide_sheet.merged_cells.ranges:
+            if (copy_start_row <= merge.min_row <= copy_end_row) or \
+                (copy_start_row <= merge.max_row <= copy_end_row):
+                merges_to_keep.append(copy(merge))
+        
+        sheet = ws
+        
+        # コピー先の行を挿入します
+        # A列の一番下の行番号を取得
+        max_row = sheet.max_row
+        while sheet['A' + str(max_row)].value is None and max_row > 0:
+            max_row -= 1
+        insert_at_row = max_row
+        # print(f"max_row：{max_row}")
+        
+        # シフトする行の高さを保持するリストを作成します
+        heights = []
+        for row_idx in range(insert_at_row, sheet.max_row + 1):
+            heights.append(sheet.row_dimensions[row_idx].height)
+        
+        # 指定行から下の行をシフト
+        sheet.insert_rows(insert_at_row, amount=(copy_end_row - copy_start_row + 1))
+
+        # 行の高さを元に戻す
+        for i, height in enumerate(heights):
+            sheet.row_dimensions[insert_at_row + i + (copy_end_row - copy_start_row + 1)].height = height
+
+        # コピーされた行を挿入
+        for i, row_data in enumerate(rows_to_copy):
+            new_row = insert_at_row + i
+            for j, cell_data in enumerate(row_data[:-1]):
+                cell = sheet.cell(row=new_row, column=j + 1)
+                cell.value = cell_data['value']
+                cell.font = cell_data['font']
+                cell.border = cell_data['border']
+                cell.fill = cell_data['fill']
+                cell.number_format = cell_data['number_format']
+                cell.protection = cell_data['protection']
+                cell.alignment = cell_data['alignment']
+            sheet.row_dimensions[new_row].height = row_data[-1]
+
+        # セル結合をコピー
+        for merged_range in merges_to_keep:
+            new_min_row = merged_range.min_row - copy_start_row + insert_at_row
+            new_max_row = merged_range.max_row - copy_start_row + insert_at_row
+            new_merge_range = "{}{}:{}{}".format(
+                openpyxl.utils.get_column_letter(merged_range.min_col),
+                new_min_row,
+                openpyxl.utils.get_column_letter(merged_range.max_col),
+                new_max_row
+            )
+            sheet.merge_cells(new_merge_range)
+            
+        # 最大行を取得
+        max_row = sheet.max_row
+        # 印刷範囲の設定を修正
+        start_col = "A"
+        end_col = 'CD'
+        print_area = f"{start_col}1:{end_col}{max_row}"
+        sheet.print_area = print_area    
+        
+        hide_sheet.sheet_state = 'hidden'   
+                    
+    # 全ての結果を入れるリスト
+    joined_results = []
+
+    # FullReportDataをリスト化
+    no10_records_list = list(no10_records)
+    # 座標によってFullReportDataを辞書に格納
+    full_report_dict = defaultdict(list)
+    for record in no10_records_list:
+        key = (record.damage_coordinate_x, record.damage_coordinate_y, record.table, record.infra, record.article)
+        full_report_dict[key].append(record)
+        
+    damage_picture_data = BridgePicture.objects.filter(infra=pk, article=article_pk)
+    # BridgePictureのデータを処理
+    for picture in damage_picture_data:
+        key = (picture.damage_coordinate_x, picture.damage_coordinate_y, picture.table, picture.infra, picture.article)
+        matching_records = full_report_dict.get(key) # キー一致のレコードを取得
+        
+        if matching_records:
+            print("チェック")
+            for record in matching_records:
+                combined_result = {
+                    'parts_name': record.parts_name,
+                    'damage_name': record.damage_name,
+                    'span_number': record.span_number,
+                    'textarea_content': record.textarea_content,
+                    'image': picture.image.url,
+                    'picture_number': picture.picture_number
+                }
+                # imageが空でない場合にのみ追加
+                if combined_result['image']:
+                    joined_results.append(combined_result) # 管理サイトにデータが格納されているか確認
+    print(f"ここは合体したデータ{len(joined_results)}個：{joined_results}")            
+
+    i10 = 0
+    unique_combinations = set()
+    for record in joined_results:
+        span_number = record['span_number'].replace('径間', '')
+        print(f"ここは{span_number}径間目")
+        print(f"その10レコード数：{len(no10_records)}")
+        if int(span_number) == span + 1:
+            hide_sheet_copy_and_paste(wb, ws)
+            span = int(span_number)
+            print(f"－－－{span}径間に変更")            
+
+            page_plus = math.ceil(i10/6)
+            print(f"現在、{page_plus}ページ目")
+            i10 = page_plus * 6
+            print(f"径間が変わるとしたら{i10}個目")
+            ws[join_spannumber_cell[i10]] = span
+            
+        if int(span_number) == span: # 同じ径間の場合
+            if i10 % 6 == 5 and i10 > 10:
+                hide_sheet_copy_and_paste(wb, ws) # プログラム4｜1ページ増やすマクロを実行
+
+            print(f"対象数:{i10}/{len(no10_records)}")
+            # 部材名を入力形式に分ける( 主桁 0101 )
+            if " " in record['parts_name']:
+                split_parts = record['parts_name'].split(" ")
+                parts_name = split_parts[0]
+                print(f"1-parts_name：{parts_name}") # 防護柵
+                parts_number = re.search(r'\d+', split_parts[1]).group()
+                print(f"2-parts_number：{parts_number}") # 0101
+            else:
+                print("カッコなし")
+                parts_name = ""
+                parts_number = ""
+            # 損傷名を入力形式に分ける( ⑦剥離・鉄筋露出-e )
+            if "-" in record['damage_name']:
+                # 置き換え用の辞書
+                number_change = {
+                    '①': '腐食',
+                    '②': '亀裂',
+                    '③': 'ゆるみ・脱落',
+                    '④': '破断',
+                    '⑤': '防食機能の劣化',
+                    '⑥': 'ひびわれ',
+                    '⑦': '剥離・鉄筋露出',
+                    '⑧': '漏水・遊離石灰',
+                    '⑨': '抜け落ち',
+                    '⑩': '補修・補強材の損傷',
+                    '⑪': '床版ひびわれ',
+                    '⑫': 'うき',
+                    '⑬': '遊間の異常',
+                    '⑭': '路面の凹凸',
+                    '⑮': '舗装の異常',
+                    '⑯': '支承部の機能障害',
+                    '⑰': 'その他',
+                    '⑱': '定着部の異常',
+                    '⑲': '変色・劣化',
+                    '⑳': '漏水・滞水',
+                    '㉑': '異常な音・振動',
+                    '㉒': '異常なたわみ',
+                    '㉓': '変形・欠損',
+                    '㉔': '土砂詰まり',
+                    '㉕': '沈下・移動・傾斜',
+                    '㉖': '洗掘',
+                }
+
+                first_char = record['damage_name'][0] # 先頭の1文字を取得                
+                print(f"first_char　{first_char}")
+                damage_name = number_change.get(first_char, "") # 辞書で値を取得
+                damage_lank = record['damage_name'][-1]
+                print(f"3-damage_name　{damage_name}") # 損傷種類（ ひびわれ ）
+                print(f"4-damage_lank　{damage_lank}") # 損傷程度（    d    ）
+                print(f"5-picture_number　{record['picture_number']}")
+            else:
+                damage_name = ""
+                print(f"3-damage_nameなし") # 損傷種類（ ひびわれ ）
+                damage_lank = ""
+                print(f"4-damage_lankなし") # 損傷程度（    d    ）     
+                          
+            print(f"damage_picture_data：{record['image']}")
+            # 最大の写真サイズ（幅、高さ）
+            
+            combination = (record['picture_number'], record['image'], record['span_number'])
+            if combination in unique_combinations:
+                print(f"Duplicate entry found: {combination}")
+                continue  # Skip duplicate entry
+            else:
+                unique_combinations.add(combination)
+                
+            max_width, max_height = 240, 180 # 4:3
+            ws[join_picturenumber_cell[i10]] = record['picture_number'] # 写真番号
+            ws[join_partsname_cell[i10]] = parts_name # 部材名
+            ws[join_number_cell[i10]] = parts_number # 要素番号
+            ws[join_damagename_cell[i10]] = damage_name # 損傷の種類
+            ws[join_lank_cell[i10]] = damage_lank # 損傷の程度
+                # 写真の有無を判断
+            try:
+                image_path = record['image'] # ImageFieldの場合は.pathをつける
+            except AttributeError:
+                print(f"エントリに 'this_time_picture' が存在しないか、無効です")
+                continue  # このエントリをスキップ
+            
+            image_path = os.path.join(settings.BASE_DIR, record['image'].lstrip('/')) # フルパスに変更
+            print(f"Calculated image path: {image_path}") 
+            
+            if os.path.exists(image_path):
+                pil_img = PILImage.open(image_path)
+                width, height = pil_img.size
+                aspect_ratio = width / height
+
+                if aspect_ratio > max_width / max_height:
+                    new_width = min(width, max_width)
+                    new_height = new_width / aspect_ratio
+                else:
+                    new_height = min(height, max_height)
+                    new_width = new_height * aspect_ratio
+
+                resized_img = pil_img.resize((int(new_width), int(new_height)))            
+                # 一時ファイル用のテンポラリディレクトリを作成
+                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+                    resized_img_path = tmp.name
+                # 画像を一時ファイルに保存
+                resized_img.save(resized_img_path)
+                # openpyxl用の画像オブジェクトを作成
+                img = OpenpyxlImage(resized_img_path)
+                # セルの位置に画像を貼り付け
+                img.anchor = ws[join_picture_cell[i10]].coordinate
+                ws.add_image(img)
+            else:
+                print("写真貼付けエラー")
+                # ws[join_picture_cell[i10]] = record.this_time_picture # 損傷写真
+                # 関数を使用する場合は関数と同じ変数を渡す(関数化に必要なデータ：3つ目　使うデータ)
+                
+            ws[join_damage_memo_cell[i10]] = record['textarea_content'] # メモ
+            print(record['textarea_content'])
+            i10 += 1
+            print(i10)
+
+    # << Django管理サイトからデータを取得（その１１、１２用） >>
+    no1112_records = DamageList.objects.filter(infra=pk, article=article_pk)
+    # 並び替え
+    sorted_records = sorted(no1112_records, key=custom_sort_key)
+    span = 1
+    i11, i12 = 0, 0
+    initial_row11, initial_row12 = 10, 10 # 1つ目の入力位置
+
+    for record in sorted_records:
+        print(f"出力レコード:{record}")
+        print(f"　径間:{span}")
+        if int(record.span_number) == span + 1:
+            span = int(record.span_number)
+            initial_row11 = initial_row11 + 18 * math.ceil(i11 / 18) # 10+18×(ページ数)
+            initial_row12 = initial_row12 + 18 * math.ceil(i12 / 18) # 10,28,46(+18)
+            i11, i12 = 0, 0
+        if int(record.span_number) == span:
+            if record.main_parts == "〇":
+                ws = wb['その１１']
+                row = initial_row11 + i11 # 行は10から
+                i11 += 1
+            else:
+                ws = wb['その１２']
+                row = initial_row12 + i12 # 行は10から
+                i12 += 1
+            print(f"　エクセル出力:{record.parts_name}{record.damage_name}{record.span_number}")
+            ws[f'H{row}'] = record.parts_name # 主桁
+            ws[f'T{row}'] = record.number # 0101
+            ws[f'E{row}'] = record.material # S,C
+            ws[f'AR{row}'] = record.damage_name # 腐食
+            ws[f'X{row}'] = record.damage_lank # d
+            ws[f'BE{row}'] = record.classification # 分類「1」
+            ws[f'AO{row}'] = record.pattern # パターン「6」
+            ws[f'BL{row}'] = record.span_number # 径間番号
+    
+    # 現在の日時を取得してファイル名に追加
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    # 新しいファイル名の生成
+    new_filename = f"{bridge_name}(作成：{timestamp}).xlsm"# _{original_file_path}"
+    # サンプル橋(作成：20241015_114539)_base.xlsm
+
+    #メモリ空間内に保存
+    virtual = BytesIO()
+    wb.save(virtual)
+    #バイト文字列からバイナリを作る
+    binary = BytesIO(virtual.getvalue())
+    return FileResponse(binary, filename = new_filename)

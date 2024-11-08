@@ -35,6 +35,8 @@ urlpatterns = [
     path('damage_comment_edit/<int:pk>/', views.damage_comment_edit , name="damage_comment_edit"),# 所見コメントを管理サイトに保存
     path('damage_comment_jadgement_edit/<int:pk>/', views.damage_comment_jadgement_edit , name="damage_comment_jadgement_edit"),# 対策区分を管理サイトに保存
     path('damage_comment_cause_edit/<int:pk>/', views.damage_comment_cause_edit , name="damage_comment_cause_edit"),# 損傷原因を管理サイトに保存
+    # << エクセルファイル出力 >>
+    path('article/<int:article_pk>/infra/<int:pk>/excel_output/', views.excel_output, name='excel-output'),# Excelファイル出力
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
