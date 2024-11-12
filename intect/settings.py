@@ -142,7 +142,7 @@ if not DEBUG:
     # ALLOWED_HOSTSにホスト名を入力
     ALLOWED_HOSTS = [ os.environ["HOST"] ]
     # CSRFトークンの生成、ハッシュ化に使われる。
-    SECRET_KEY = os.environ["SECRETKEY"]
+    SECRET_KEY = os.environ["SECRET_KEY"]
     
     # 静的ファイル配信ミドルウェア（whitenoise）を使用　※順番不一致だと動かない
     MIDDLEWARE = [
