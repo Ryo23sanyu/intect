@@ -440,18 +440,15 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
     # << 辞書型として、全径間を1つの多重リストに格納 >>
     max_search_title_text = infra.径間数
     print(f"最大径間数：{max_search_title_text}")
-    database_sorted_items = []  # 結果をまとめるリスト
     
-    for search_title_text_with_suffix in range(1, max_search_title_text + 1):
-        search_title_text = f"{search_title_text_with_suffix}径間"
-        
-        print(search_title_text)
-        #                                                                                   1径間                  損傷図
-        sub_database_sorted_items = create_picturelist(request, table, dxf_filename, search_title_text, second_search_title_text)
+    if "search_title_text" in request.GET:# request.GET：検索URL（http://127.0.0.1:8000/article/1/infra/bridge_table/?search_title_text=1径間） 
+        search_title_text = request.GET["search_title_text"]# 検索URL内のsearch_title_textの値（1径間）を取得する
+    else:
+        search_title_text = "1径間" # 検索URLにsearch_title_textがない場合
+    sub_database_sorted_items = create_picturelist(request, table, dxf_filename, search_title_text, second_search_title_text)
+    
+    database_sorted_items = [{'search': search_title_text, **item} for item in sub_database_sorted_items]
 
-        for item in sub_database_sorted_items:
-            item['search'] = search_title_text
-            database_sorted_items.append(item)
 
     """辞書型の多重リストをデータベースに登録"""
     # << ['']を外してフラットにする >>
@@ -488,7 +485,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
     picture_counter = 1
     index_counter = 0
     picture_number_box = []
-
+    
+    print("database_sorted_itemsの解析開始")
     for damage_data in database_sorted_items:
         # 元の辞書から 'picture_number' の値を取得
         #             　辞書型 ↓           ↓ キーの名前      ↓ 存在しない場合、デフォルト値として空白を返す
@@ -770,7 +768,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                         damage_obj, created = FullReportData.objects.update_or_create(**update_fields)
                         damage_obj.save()
                     except IntegrityError:
-                        print("ユニーク制約に違反していますが、既存のデータを更新しませんでした。")
+                        print("ユニーク制約に違反しています。")
                     
                     
         elif not split_items_table and not damages_items_table and name_length >= 2: # 部材名が2つ以上の場合
@@ -917,7 +915,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                             damage_obj, created = FullReportData.objects.update_or_create(**update_fields)
                             damage_obj.save()
                         except IntegrityError:
-                            print("ユニーク制約に違反していますが、既存のデータを更新しませんでした。")
+                            print("ユニーク制約に違反しています。")
                         
             elif not split_items_table and not damages_items_table and damage_length >= 2: # かつ損傷名が2つ以上の場合
                 picture_number_index = 0
@@ -1065,7 +1063,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                 damage_obj, created = FullReportData.objects.update_or_create(**update_fields)
                                 damage_obj.save()
                             except IntegrityError:
-                                print("ユニーク制約に違反していますが、既存のデータを更新しませんでした。")
+                                print("ユニーク制約に違反しています。")
                                  
         else: # 多重リストの場合
             picture_number_index = 0
@@ -1118,7 +1116,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                     damage_obj, created = FullReportData.objects.update_or_create(**update_fields)
                                     damage_obj.save()
                                 except IntegrityError:
-                                    print("ユニーク制約に違反していますが、既存のデータを更新しませんでした。")
+                                    print("ユニーク制約に違反しています。")
                             
                             if single_picture:
                                 images = [single_picture]
@@ -1260,17 +1258,10 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                 damage_obj, created = FullReportData.objects.update_or_create(**update_fields)
                                 damage_obj.save()
                             except IntegrityError:
-                                print("ユニーク制約に違反していますが、既存のデータを更新しませんでした。")
-        print("かかった時間_time2: ", time.time() - start2 )                       
+                                print("ユニーク制約に違反しています。")
+        print("管理サイトの登録までかかった時間_time2: ", time.time() - start2 )
+                
     """辞書型の多重リストをデータベースに登録(ここまで)"""
-
-    if "search_title_text" in request.GET:
-        # request.GET：検索URL（http://127.0.0.1:8000/article/1/infra/bridge_table/?search_title_text=1径間） 
-        search_title_text = request.GET["search_title_text"]
-        # 検索URL内のsearch_title_textの値（1径間）を取得する
-    else:
-        search_title_text = "1径間" # 検索URLにsearch_title_textがない場合
-    second_search_title_text = "損傷図"
 
     bridges = FullReportData.objects.filter(infra=pk, span_number=search_title_text) # 径間で絞り込み
     # parts_name のカスタム順序リスト
@@ -1339,7 +1330,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
     # 渡すデータ：　損傷データ　↑　　　       　   joinと損傷座標毎にグループ化したデータ　↑　　　　　　 写真毎にグループ化したデータ　↑ 　　       径間ボタン　↑
     # print(f"写真格納場所確認：{context}")
     # テンプレートをレンダリング
-    print("かかった時間_time1: ", time.time() - start1 )
+    print("損傷写真帳の表示までかかった時間_time1: ", time.time() - start1 )
     return render(request, 'infra/bridge_table.html', context)
 
 # << entity_extension 　　　　関数をdxf_file.py(別モジュール)に移動 >>
@@ -1437,6 +1428,7 @@ def upload_picture(request, article_pk, pk):
 
 # << 所見一覧の作成 >>
 def observations_list(request, article_pk, pk):
+    start1_1 = time.time()
     context = {}
     print("所見ID確認")
     infra = Infra.objects.filter(id=pk).first()
@@ -1470,14 +1462,6 @@ def observations_list(request, article_pk, pk):
 
     print(f"dxfファイルのデコードURLは：{encode_dxf_filename}")
     print(f"dxfファイルの絶対URLは：{dxf_filename}")
-    
-    # URLから径間番号を取得
-    if "search_title_text" in request.GET:
-        search_title_text = request.GET["search_title_text"]
-    else:
-        search_title_text = "1径間"
-
-    second_search_title_text = "損傷図"
     
     # sorted_items = create_picturelist(request, table, dxf_filename, search_title_text, second_search_title_text)
     """"""
@@ -1944,6 +1928,7 @@ def observations_list(request, article_pk, pk):
         
     context = {'object': observer_object, 'article_pk': article_pk, 'data': filtered_bridges, 'article_pk': article_pk, 'pk': pk, 'buttons': buttons, 'images': images_url}
     # print(f"所見用context：{context}")
+    print("所見一覧の表示までかかった時間_time1: ", time.time() - start1_1 )
     return render(request, 'infra/observer_list.html', context)
 
 
@@ -2013,19 +1998,27 @@ def custom_sort_key(record):
 
 # << 管理サイトに登録したデータをエクセルに出力 >>
 def excel_output(request, article_pk, pk):
+    excel_time_3 = time.time()
     used_image_list = []
     bridge_name = ""
-
-    bucket_name = 'infraprotect'
-    original_file_path = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/H31_bridge_base.xlsm"
-    print(f"エクセルひな形のURL：{original_file_path}")
+    import xlwings as xw
+    print("1")
+    file_stream = r"C:\Users\dobokuka4\Desktop\intect_dxf\bridge_base.xlsm"
+    print("2")
+    app = xw.App(visible=False)
+    print("3")
+    # wb = app.books.open(file_stream)
+    # bucket_name = 'infraprotect'
     # エクセルファイルを読み込む
-    s3 = boto3.client('s3')
-    response = s3.get_object(Bucket=bucket_name, Key="H31_bridge_base.xlsm")
-    file_stream = BytesIO(response['Body'].read())
+    # s3 = boto3.client('s3')
+    # response = s3.get_object(Bucket=bucket_name, Key="H31_bridge_base.xlsm")
+    # file_stream = BytesIO(response['Body'].read())
+    
     wb = openpyxl.load_workbook(file_stream, keep_vba=True)
-    print("読み取り")
+    # print("読み取り")
+    print("ひな形のDLまでかかった時間_time3: ", time.time() - excel_time_3 )
     # << Django管理サイトからデータを取得（その１用） >>
+    excel_time_1 = time.time()
     no01_records = Infra.objects.filter(id=pk, article=article_pk)
     ws = wb['その１']
     for record in no01_records:
@@ -2045,8 +2038,9 @@ def excel_output(request, article_pk, pk):
         # 適用示方書を処理
         rulebooks = ', '.join([str(rulebook) for rulebook in record.適用示方書.all()])
         ws['AK10'] = rulebooks
-
+    print("その1の作成にかかった時間_time1: ", time.time() - excel_time_1 )
     # << Django管理サイトからデータを取得（その７、８用） >>
+    excel_time_78 = time.time()
     no0708_records = DamageComment.objects.filter(infra=pk, article=article_pk)
     # 並び替えて出力
     sorted_records = sorted(no0708_records, key=custom_sort_key)
@@ -2056,8 +2050,8 @@ def excel_output(request, article_pk, pk):
     initial_row07, initial_row08= 13, 13 # 1つ目の入力位置
     
     for record in sorted_records:
-        print(f"出力レコード:{record}")
-        print(f"　径間:{span}")
+        # print(f"出力レコード:{record}")
+        # print(f"　径間:{span}")
         if int(record.span_number) == span + 1:
             span = int(record.span_number)
             initial_row07 = initial_row07 + 8 * math.ceil(i07 / 8) # 13+8×(ページ数)
@@ -2072,7 +2066,7 @@ def excel_output(request, article_pk, pk):
                 ws = wb['その８']
                 row = initial_row08 + i08 # 行は13から
                 i08 += 1
-            print(f"　エクセル出力:{record.comment_parts_name}{record.parts_number}{record.damage_name}{record.jadgement}")
+            # print(f"　エクセル出力:{record.comment_parts_name}{record.parts_number}{record.damage_name}{record.jadgement}")
             ws[f'F{row}'] = record.comment_parts_name # 主桁
             ws[f'J{row}'] = record.parts_number # 01
             ws[f'D{row}'] = record.material # S,C
@@ -2100,7 +2094,7 @@ def excel_output(request, article_pk, pk):
             
                 ws[jadgement_position] = record.damage_name # 腐食
                 ws[f'AU{row}'] = record.cause # 損傷原因「経年変化」  
-                print(f"初見コメント：{record.comment}")
+                # print(f"初見コメント：{record.comment}")
             
                 if record.comment != None:
                     choice_comment = record.comment
@@ -2110,13 +2104,14 @@ def excel_output(request, article_pk, pk):
                 ws[f'BC{row}'] = choice_comment # 〇〇が見られる。
             else:
                 ws[f'BC{row}'] = "健全である。"
-
+    print("その7・8の作成にかかった時間_time78: ", time.time() - excel_time_78 )
     # << （その１０） >>
+    excel_time_10 = time.time()
     no10_records = FullReportData.objects.filter(infra=pk, article=article_pk, this_time_picture__isnull=False).exclude(this_time_picture='')
     #                                                                          this_time_fieldがnull(空)=でない 除外する(this_time_picture='')
     ws = wb['その１０']
-    print(f"最大径間数：{span}")
-    print(f"最大径間数：{int(span)}")
+    # print(f"最大径間数：{span}")
+    # print(f"最大径間数：{int(span)}")
     # << セル位置を作成 >>
     picture_and_spannumber_row = 9 # 部材名・要素番号
     partsname_and_number_row = 10 # 部材名・要素番号
@@ -2259,10 +2254,10 @@ def excel_output(request, article_pk, pk):
     for picture in damage_picture_data:
         key = (picture.damage_coordinate_x, picture.damage_coordinate_y, picture.table, picture.infra, picture.article)
         matching_records = full_report_dict.get(key) # キー一致のレコードを取得
-        print(picture.image)
+        # print(picture.image)
         
         if matching_records:
-            print("チェック")
+            # print("チェック")
             for record in matching_records:
                 combined_result = {
                     'parts_name': record.parts_name,
@@ -2281,33 +2276,33 @@ def excel_output(request, article_pk, pk):
     unique_combinations = set()
     for record in joined_results:
         span_number = record['span_number'].replace('径間', '')
-        print(f"ここは{span_number}径間目")
-        print(f"その10レコード数：{len(no10_records)}")
+        # print(f"ここは{span_number}径間目")
+        # print(f"その10レコード数：{len(no10_records)}")
         if int(span_number) == span + 1:
             hide_sheet_copy_and_paste(wb, ws)
             span = int(span_number)
-            print(f"－－－{span}径間に変更")            
+            # print(f"－－－{span}径間に変更")            
 
             page_plus = math.ceil(i10/6)
-            print(f"現在、{page_plus}ページ目")
+            # print(f"現在、{page_plus}ページ目")
             i10 = page_plus * 6
-            print(f"径間が変わるとしたら{i10}個目")
+             #print(f"径間が変わるとしたら{i10}個目")
             ws[join_spannumber_cell[i10]] = span
             
         if int(span_number) == span: # 同じ径間の場合
             if i10 % 6 == 5 and i10 > 10:
                 hide_sheet_copy_and_paste(wb, ws) # プログラム4｜1ページ増やすマクロを実行
 
-            print(f"対象数:{i10}/{len(no10_records)}")
+            # print(f"対象数:{i10}/{len(no10_records)}")
             # 部材名を入力形式に分ける( 主桁 0101 )
             if " " in record['parts_name']:
                 split_parts = record['parts_name'].split(" ")
                 parts_name = split_parts[0]
-                print(f"1-parts_name：{parts_name}") # 防護柵
+                # print(f"1-parts_name：{parts_name}") # 防護柵
                 parts_number = re.search(r'\d+', split_parts[1]).group()
-                print(f"2-parts_number：{parts_number}") # 0101
+                # print(f"2-parts_number：{parts_number}") # 0101
             else:
-                print("カッコなし")
+                # print("カッコなし")
                 parts_name = ""
                 parts_number = ""
             # 損傷名を入力形式に分ける( ⑦剥離・鉄筋露出-e )
@@ -2343,24 +2338,24 @@ def excel_output(request, article_pk, pk):
                 }
 
                 first_char = record['damage_name'][0] # 先頭の1文字を取得                
-                print(f"first_char　{first_char}")
+                # print(f"first_char　{first_char}")
                 damage_name = number_change.get(first_char, "") # 辞書で値を取得
                 damage_lank = record['damage_name'][-1]
-                print(f"3-damage_name　{damage_name}") # 損傷種類（ ひびわれ ）
-                print(f"4-damage_lank　{damage_lank}") # 損傷程度（    d    ）
-                print(f"5-picture_number　{record['picture_number']}")
+                # print(f"3-damage_name　{damage_name}") # 損傷種類（ ひびわれ ）
+                # print(f"4-damage_lank　{damage_lank}") # 損傷程度（    d    ）
+                 #print(f"5-picture_number　{record['picture_number']}")
             else:
                 damage_name = ""
-                print(f"3-damage_nameなし") # 損傷種類（ ひびわれ ）
+                # print(f"3-damage_nameなし") # 損傷種類（ ひびわれ ）
                 damage_lank = ""
-                print(f"4-damage_lankなし") # 損傷程度（    d    ）     
+                # print(f"4-damage_lankなし") # 損傷程度（    d    ）     
                           
-            print(f"damage_picture_data：{record['image']}")
+            # print(f"damage_picture_data：{record['image']}")
             # 最大の写真サイズ（幅、高さ）
             
             combination = (record['picture_number'], record['image'], record['span_number'])
             if combination in unique_combinations:
-                print(f"Duplicate entry found: {combination}")
+                # print(f"Duplicate entry found: {combination}")
                 continue  # Skip duplicate entry
             else:
                 unique_combinations.add(combination)
@@ -2374,11 +2369,11 @@ def excel_output(request, article_pk, pk):
                 # 写真の有無を判断
             try:
                 image_path = record['image'] # ImageFieldの場合は.pathをつける
-                print(image_path)
+                # print(image_path)
                 used_image_list.append(image_path)# 見つけた写真URLをリストに格納
                 
             except AttributeError:
-                print(f"エントリに 'this_time_picture' が存在しないか、無効です")
+                # print(f"エントリに 'this_time_picture' が存在しないか、無効です")
                 continue  # このエントリをスキップ
             
             # image_path = os.path.join(settings.BASE_DIR, record['image'].lstrip('/')) # フルパスに変更
@@ -2418,11 +2413,13 @@ def excel_output(request, article_pk, pk):
                 print(f"写真貼付けエラー: {e}")
                 
             ws[join_damage_memo_cell[i10]] = record['textarea_content'] # メモ
-            print(record['textarea_content'])
+            # print(record['textarea_content'])
             i10 += 1
-            print(i10)
-
+            # print(i10)
+    print("その10の作成にかかった時間_time10: ", time.time() - excel_time_10 )
+    
     # << Django管理サイトからデータを取得（その１１、１２用） >>
+    excel_time_1112 = time.time()
     no1112_records = DamageList.objects.filter(infra=pk, article=article_pk)
     # 並び替え
     sorted_records = sorted(no1112_records, key=custom_sort_key)
@@ -2431,8 +2428,8 @@ def excel_output(request, article_pk, pk):
     initial_row11, initial_row12 = 10, 10 # 1つ目の入力位置
 
     for record in sorted_records:
-        print(f"出力レコード:{record}")
-        print(f"　径間:{span}")
+        # print(f"出力レコード:{record}")
+        # print(f"　径間:{span}")
         if int(record.span_number) == span + 1:
             span = int(record.span_number)
             initial_row11 = initial_row11 + 18 * math.ceil(i11 / 18) # 10+18×(ページ数)
@@ -2447,7 +2444,7 @@ def excel_output(request, article_pk, pk):
                 ws = wb['その１２']
                 row = initial_row12 + i12 # 行は10から
                 i12 += 1
-            print(f"　エクセル出力:{record.parts_name}{record.damage_name}{record.span_number}")
+            # print(f"　エクセル出力:{record.parts_name}{record.damage_name}{record.span_number}")
             ws[f'H{row}'] = record.parts_name # 主桁
             ws[f'T{row}'] = record.number # 0101
             ws[f'E{row}'] = record.material # S,C
@@ -2456,13 +2453,15 @@ def excel_output(request, article_pk, pk):
             ws[f'BE{row}'] = record.classification # 分類「1」
             ws[f'AO{row}'] = record.pattern # パターン「6」
             ws[f'BL{row}'] = record.span_number # 径間番号
-
+    print("その11・12の作成にかかった時間_time1112: ", time.time() - excel_time_1112 )
+    
     # 現在の日時を取得してファイル名に追加
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     # 新しいファイル名の生成
     new_filename = f"{bridge_name}(作成：{timestamp}).xlsm"# _{original_file_path}"
     # サンプル橋(作成：20241015_114539)_base.xlsm
     
+    exsel_time_2 = time.time()
     # 画像をダウンロードしてZIP化
     zip_data = download_and_zip_images(used_image_list)
 
@@ -2475,11 +2474,13 @@ def excel_output(request, article_pk, pk):
     with open(file_path, 'wb') as f:
         f.write(zip_data.read())
 
-    print("Images have been zipped into 'downloaded_images.zip'")
+    print("写真DLまでかかった時間_time2: ", time.time() - exsel_time_2 )
     
+    exsel_time_1 = time.time()
     #メモリ空間内に保存
     virtual = BytesIO()
     wb.save(virtual)
     #バイト文字列からバイナリを作る
     binary = BytesIO(virtual.getvalue())
+    print("完成したエクセル出力までかかった時間_time1: ", time.time() - exsel_time_1 )
     return FileResponse(binary, filename = new_filename)

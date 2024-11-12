@@ -24,11 +24,6 @@ def entity_extension(mtext, neighbor):
     x_end  = mtext_insertion[0] + mtext.dxf.width # X終了位置= 開始位置＋幅
     y_start = mtext_insertion[1] + mtext.dxf.char_height # Y開始位置
     y_end  = mtext_insertion[1] - mtext.dxf.char_height * (text_lines_count + 1) # 文字の高さ×(行数+1)
-    # print("～～ DXF文字情報 ～～")
-    # print(f"mtextテキスト:{mtext.dxf.text}\n　Dxfテキスト:{neighbor.dxf.text}")
-    # print(f"mtext挿入点:{mtext_insertion}\n　Def挿入点:{neighbor_insertion}\n　行数:{text_lines_count}")
-    # print(f"mtext文字幅:{mtext.dxf.width}\n　mtext1行当たりの文字高:{mtext.dxf.char_height}")
-    # print(f"X座標の取得範囲:{x_start}～{x_end}\nY座標の取得範囲:{y_start}～{y_end}")
         
     # MTextの下、もしくは右に特定のプロパティで描かれた文字が存在するかどうかを判定する(座標：右が大きく、上が大きい)
     if (neighbor_insertion[0] >= x_start and neighbor_insertion[0] <= x_end):
@@ -40,10 +35,7 @@ def entity_extension(mtext, neighbor):
 
 # << 座標値からdefpoints枠内の文字列のみ取得 >>
 def find_square_around_text(article_pk, pk, dxf_filename, search_title_text, second_search_title_text):
-
-    print("関数の中身")
-    print(dxf_filename)
-    
+    print("find_square_around_text関数の実行")
     article = Article.objects.filter(id=article_pk).first()
     infra = Infra.objects.filter(id=pk).first()
     
@@ -78,36 +70,29 @@ def find_square_around_text(article_pk, pk, dxf_filename, search_title_text, sec
         print(f"ファイルの読み込みに失敗しました: {e}")
     except ezdxf.DXFStructureError as e:
         print(f"DXF構造エラー: {e}")
-    # desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-    # output_filepath = os.path.join(desktop_path, "CAD変更一時保存.dxf")
-    # doc.saveas(output_filepath)
     
     text_positions = [] # 見つかったテキストの位置を格納するためのリストを作成
     extracted_text = []
-    print("途中経過　確認1")
+
     # MTEXTエンティティの各要素をtextという変数に代入してループ処理
     for mtext_insert_point in msp.query('MTEXT'): # モデルスペース内の「MTEXT」エンティティをすべて照会し、ループ処理
-        print(mtext_insert_point)
         if mtext_insert_point.dxf.text == search_title_text:# target_text: # エンティティのテキストが検索対象のテキストと一致した場合
             text_insertion_point = mtext_insert_point.dxf.insert # テキストの挿入点(dxf.insert)を取得します。
             text_positions.append(text_insertion_point[0]) # 挿入点のX座標をリストに保存
             break
-    print("途中経過　確認2")
     if not text_positions: # text_positionsリストが空の場合(見つけられなかった場合)
         for mtext_insert_point in msp.query('MTEXT'): # モデルスペース内の「MTEXT」エンティティをすべて照会し、ループ処理
             if mtext_insert_point.dxf.text == second_search_title_text:# second_target_text: # エンティティのテキストが検索対象のテキストと一致した場合
                 text_insertion_point = mtext_insert_point.dxf.insert # テキストの挿入点(dxf.insert)を取得します。
                 text_positions.append(text_insertion_point[0]) # 挿入点のX座標をリストに保存
                 break
-    print("途中経過　確認3")
     # Defpointsレイヤーで描かれた正方形枠の各要素をsquare変数に代入してループ処理
     for defpoints_square in msp.query('LWPOLYLINE[layer=="Defpoints"]'): # 
-        print(defpoints_square)
         if len(defpoints_square) == 4: # 正方形(=4辺)の場合
             square_x_values = [four_points[0] for four_points in defpoints_square] # squareというリストをループして各点(point)からx座標(インデックス0の要素)を抽出
             square_min_x = min(square_x_values) # 枠の最小X座標を取得
             square_max_x = max(square_x_values) # 枠の最大X座標を取得
-            
+        
         # 文字のX座標が枠の最小X座標と最大X座標の間にあるかチェック
         # text_positionsの各要素をtext_x_positionという変数に代入してforループを処理
         for text_x_position in text_positions:
@@ -120,8 +105,6 @@ def find_square_around_text(article_pk, pk, dxf_filename, search_title_text, sec
                 left_bottom_point = list(defpoints_square)[3][0] # 左下の座標
                 defpoints_max_x = max(left_top_point,right_top_point,left_bottom_point,right_bottom_point) # X座標の最大値
                 defpoints_min_x = min(left_top_point,right_top_point,left_bottom_point,right_bottom_point) # X座標の最小値
-    print("途中経過　確認4")
-    
     # 指定したX座標範囲内にあるテキストを探す
     for circle_in_text in msp.query('MTEXT'):
         if defpoints_min_x <= circle_in_text.dxf.insert.x <= defpoints_max_x and circle_in_text.dxf.layer != 'Defpoints':
@@ -140,14 +123,14 @@ def find_square_around_text(article_pk, pk, dxf_filename, search_title_text, sec
                         if entity_extension(circle_in_text, neighbor):
                         # 特定のプロパティ(Defpoints)で描かれた文字のテキストを抽出する
                             related_text = neighbor.plain_text()
-                            print(f"DXFテキストデータ:{related_text}")
+                            # print(f"DXFテキストデータ:{related_text}")
                             defx, defy, _ = neighbor.dxf.insert
                         #extracted_text.append(neighbor_text)
                             break # 文字列が見つかったらbreakによりforループを終了する
 
-                    if  len(related_text) > 0: #related_textに文字列がある＝Defpointsレイヤから見つかった場合
-                        cad_data.append(related_text[:]) # cad_dataに「部材名～使用写真」までを追加
-                        cad_data.append([str(x), str(y)]) # 続いてcad_dataに「MTEXT」のX,Y座標を追加
+                    if len(related_text) > 0: #related_textに文字列がある＝Defpointsレイヤから見つかった場合
+                       cad_data.append(related_text[:]) # cad_dataに「部材名～使用写真」までを追加
+                       cad_data.append([str(x), str(y)]) # 続いてcad_dataに「MTEXT」のX,Y座標を追加
                 #最後にまとめてcad_dataをextracted_textに追加する
                     extracted_text.append(cad_data[:] + [[str(defx), str(defy)]]) # extracted_textに「MTEXTとその座標」およびdefのX,Y座標を追加
                     
@@ -196,8 +179,6 @@ def find_square_around_text(article_pk, pk, dxf_filename, search_title_text, sec
                     # photo_number = '写真番号-00'
                     # defpoints = 'defpoints'
                     
-                    # 新しい形式のサブリストを作成してprocessed_listに追加
-                    # new_sub_list = [header, status, photo_number, defpoints]
                     new_sub_list = [header, status]
                     extracted_text.append(new_sub_list)
 

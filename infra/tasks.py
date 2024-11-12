@@ -1,7 +1,9 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import fnmatch
-from functools import reduce
+from functools import lru_cache, reduce
 import glob
 import re
+import time
 
 import boto3
 import urllib
@@ -9,13 +11,19 @@ import urllib
 from markupsafe import Markup
 from infra.dxf_file import find_square_around_text
 from infra.models import NameEntry
+from infra.picture_damages_memo import format_damages, process_damage, process_related_damages
 
+# 名前の置換関数をループの外で定義
+def get_sorted_replacements(article_id):
+    name_entries = NameEntry.objects.filter(article=article_id)
+    replacements = [(entry.alphabet, entry.name) for entry in name_entries] + [(" ", "　")]
+    return sorted(replacements, key=lambda x: len(x[0]), reverse=True)
 
 # << 損傷写真帳に渡すためのデータをリスト化 >>
 def create_picturelist(request, table, dxf_filename, search_title_text, second_search_title_text):
     print("関数スタート：create_picturelist")
     #                                                                                              1径間　　　　　  　　　　損傷図
-    extracted_text = find_square_around_text(table.article.id, table.infra.id, dxf_filename, search_title_text, second_search_title_text) # 関数の定義
+    extracted_text = find_square_around_text(table.article.id, table.infra.id, dxf_filename, search_title_text, second_search_title_text)
     # find_square_around_text関数の結果をextracted_text変数に格納
     print("関数スタート：find_square_around_text")
     # リストを処理して、スペースを追加する関数を定義
@@ -48,7 +56,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
                 # 次の位置の要素を削除
                 extracted_text.remove(next_data)
     # extracted_text = [['主桁 Mg0101', '①-d', '写真番号-00', 'defpoints'], ['主桁 Mg0902', '⑦-c', '写真番号-00', 'defpoints']]
-    
+    print("位置要素を取得")
 # ↓　インデックスを1つ左に移動した(return sorted_items以外)
     # それぞれのリストから文字列のみを抽出する関数(座標以外を抽出)
     def extract_text(data):
@@ -82,7 +90,8 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
 
     # 関数を使って特定の部分を抽出
     extracted_text, removed_elements = extract_text(extracted_text)
-
+    print("特定の要素を抽出")
+    
     first_item = []
     current_detail = None  # 現在処理しているdetailを追跡
 
@@ -111,7 +120,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
     #print(result_list)
         first_item.append(result_list)
     
-    #print(first_item)
+    print(f"first_item：{first_item}")
     extracted_text = first_item
         
     sub_first_item = [] 
@@ -139,7 +148,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
                 first_sub_item.append(wrapped_markup_str)
         sub_first_item.append(first_sub_item)
     # [[[Markup('横桁 Cr0503')]], [[Markup('主桁 Mg0110')], [Markup('床版 Ds0101')]], [[Markup('横桁 Cr0802')]], [[Markup('排水ます Dr0102,0201')]], [[Markup('排水ます Dr0202')]], [[Markup('PC定着部 Cn1101')]], [[Markup('排水ます Dr0102,0201,0202')]]]
-
+        print("sub_first_itemの作成")
         def process_item(item):
             if isinstance(item, Markup):
                 item = str(item)
@@ -264,14 +273,11 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
 
     last_item = remove_parentheses_from_list(result_items)
 
-    damage_table = []  # 空のリストを作成
-    # table_instance = Table.objects.filter(infra=pk).first()
-    # print(f"写真パス:{table_instance.infra.article.ファイルパス}")
-    # print(f"橋梁名:{table_instance.infra.title}")
-    # first_itemの要素の数だけループ処理
-    # print(f"first_item：{first_item}")
+    damage_table = []
     len_first_item = len(first_item)
+    
     for i in range(len_first_item):
+        start3 = time.time()
         try:
             third = third_items[i]
         except IndexError:
@@ -281,36 +287,12 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
         if len(last_item)-1 < i:
             break
 
-        if isinstance(last_item[i], list):
-            continue
-        else:
-            # 組み合わせを収集するリスト
-            replacements = []
+        if not isinstance(last_item[i], list):
+            sorted_replacements = get_sorted_replacements(table.article.id)
+            name_item = reduce(lambda acc, pair: acc.replace(pair[0], pair[1]), sorted_replacements, last_item[i])
 
-            # name_entriesの取得 NameEntry.objects.all()
-            # tableにarticleが紐付いているため、そこから取得(tableのinfraのarticle(id))
-            name_entries = NameEntry.objects.filter(article = table.article.id)
-            # print(name_entries)
-
-            # 置換情報を収集する
-            for name_entry in name_entries:
-                replacements.append((name_entry.alphabet, name_entry.name))
-            replacements.append((" ", "　"))
-            # print(f'replacements: {replacements}')
-            # 置換リストをキーの長さで降順にソート
-            sorted_replacements = sorted(replacements, key=lambda x: len(x[0]), reverse=True)
-
-            # 置換関数を定義
-            def replace_all(text, replacements):
-                return reduce(lambda acc, pair: acc.replace(pair[0], pair[1]), replacements, text)
-            
-            name_item = replace_all(last_item[i], sorted_replacements) # アルファベットを名前に置換
-            # name_item = last_item[i].replace("S", "佐藤").replace("H", "濵田").replace(" ", "　")
-        # name_item に格納されるのは 'NON-a', '9月7日 佐藤*/*404', '9月7日 佐藤*/*537', '9月8日 佐藤*/*117,9月8日 佐藤*/*253'のいずれか
-        
         pattern = r',(?![^(]*\))'
-        dis_items = re.split(pattern, name_item)#「9月8日 佐藤*/*117」,「9月8日 佐藤*/*253」
-        # コンマが付いていたら分割
+        dis_items = re.split(pattern, name_item)
         
         time_result = []
         current_date = ''  # 現在の日付を保持する変数
@@ -326,80 +308,56 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
 
         name_and_wildcardnumber = [item + ".jpg" for item in time_result]
         # ['9月8日 佐藤*/*117.jpg', '9月8日 佐藤*/*253.jpg']
+        print("写真の検索にかかった時間_time3: ", time.time() - start3 )
         
         # << S3にアップロードした写真のワイルドカード検索 >>
+        start4 = time.time()
         s3 = boto3.client('s3')
 
         bucket_name = 'infraprotect'
         article_folder_name = table.article.案件名
         infra_folder_name = table.infra.title
-        # print(article_folder_name)
-        # print(infra_folder_name)
 
-        # << カッコを含む文字を削除 ※二重かっこ「 (( 他 )) 」は不可 >>
-        # sub_dis_items = ['9月8日 佐藤(いろいろ)/*117.jpg', '9月8日 佐藤(ぽけぽけ)/*253.jpg']
-        # スラッシュとコンマで分割する
-        pattern = r'\(.*?\)|\.jpg|\*' # カッコとその中・「.jpg」・「*」を削除
+        pattern = r'\(.*?\)|\.jpg|\*'  # カッコとその中・「.jpg」・「*」を削除
         split_wildcard_lists = [re.split(r'[,/]', re.sub(pattern, '', item)) for item in name_and_wildcardnumber]
-        # リストを表示する
-        s3_folder_name = [article_folder_name+"/"+infra_folder_name+"/"+item[0]+"/" for item in split_wildcard_lists if len(item) >= 1] # ['9月8日 佐藤', '9月8日 佐藤']
-        wildcard_picture = tuple(item[1] for item in split_wildcard_lists if len(item) >= 2) # ('117', '253')
-        
+
+        s3_folder_name = [f"{article_folder_name}/{infra_folder_name}/{item[0]}/" for item in split_wildcard_lists if len(item) >= 1]
+        wildcard_picture = tuple(item[1] for item in split_wildcard_lists if len(item) >= 2)  # ('117', '253')
+
+        @lru_cache(maxsize=None)
         def search_s3_objects(bucket, prefix, pattern):
             paginate = s3.get_paginator("list_objects_v2")
-            matching_keys = []  # 見つかったキーを保持するリスト
+            matching_keys = []
 
-            # 各ページを順に確認
             for page in paginate.paginate(Bucket=bucket, Prefix=prefix):
                 if 'Contents' in page:
                     for obj in page['Contents']:
                         key = obj['Key']
-                        # パターンに基づいてファイルが一致しているか確認
                         if fnmatch.fnmatch(key, f"{prefix}*{pattern}.jpg"):
                             matching_keys.append(key)
-                            # print(f"見つかった写真名：{matching_keys}")
-
             return matching_keys
-            
+
         sub_dis_items = []
 
-        for prefix, pattern in zip(s3_folder_name, wildcard_picture):
+        def process_search(prefix, pattern):
             found_keys = search_s3_objects(bucket_name, prefix, pattern)
+            result = []
             for found_key in found_keys:
-                # 各見つかったキーに基づいてURLを生成してリストに追加
                 object_url = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{found_key}"
                 encode_dxf_filename = urllib.parse.quote(object_url, safe='/:')
-                sub_dis_items.append(encode_dxf_filename)
-                # print("この写真URLは：", sub_dis_items)
-        
-        photo_paths = []
-        # photo_pathsリストを作成
-        for item in sub_dis_items:
-            # decoded_item = urllib.parse.unquote(item) # デコード
-            # normalized_item = decoded_item.replace('/', '\\')
-            # print(f"decoded_item:{decoded_item}")
-            #print(f"item：{item}")
-            # sub_photo_paths = glob.glob(normalized_item)
-            sub_photo_paths = glob.glob(item)
-            photo_paths.extend(sub_photo_paths)
-            # photo_pathsリストにsub_photo_pathsを追加
-        # print(f"photo_paths：{photo_paths}")
-        
-        if len(photo_paths) > 0:# photo_pathにはリストが入るため、[i]番目の要素が0より大きい場合
-            picture_urls = [''.join(photo_path).replace('infra/static/', '') for photo_path in photo_paths]
-            # picture_urls = [''.join(photo_path).replace('infra/static/', '').replace('infra/img\\', '') for photo_path in photo_paths]
-            # photo_pathsの要素の数だけphoto_pathという変数に代入し、forループを実行
-            # photo_pathという1つの要素の'infra/static/'を空白''に置換し、中間文字なしで結合する。
-            # picture_urlsという新規配列に格納する。
-            # print(f"photo_paths：{picture_urls}")
-        else:# それ以外の場合
-            picture_urls = None
-            #picture_urlsの値は[None]とする。
-        picture_urls = sub_dis_items
-        # print(f"picture_urls：{picture_urls}")
+                result.append(encode_dxf_filename)
+            return result
+
+        with ThreadPoolExecutor() as executor:
+            future_to_search = {executor.submit(process_search, prefix, pattern): (prefix, pattern) for prefix, pattern in zip(s3_folder_name, wildcard_picture)}
+            
+            for future in as_completed(future_to_search):
+                search_results = future.result()
+                sub_dis_items.extend(search_results)
+        print("写真のリスト追加にかかった時間_time4: ", time.time() - start4 )
         
 # << ◆写真メモを作成するコード◆ >>
-
+        start5 = time.time()
         bridge_damage = [] # すべての"bridge"辞書を格納するリスト
 
         bridge = {
@@ -676,63 +634,26 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
                     for first_item in first_items:
                         for elem in first_item:
                             if elem in primary_damages_dict:
-                                formatted_damages = ",".join(list(dict.fromkeys(primary_damages_dict[elem])))
-                                sub_related_damages.append(f"{elem}:{formatted_damages}")
-                                #print(f"sub_related_damages：{sub_related_damages}") # ['支承本体 Bh0101:①腐食(小小)-b,⑤防食機能の劣化(分類1)-e', '沓座モルタル Bm0101:⑦剥離・鉄筋露出-c']
+                                sub_related_damages.append(f"{elem}:{format_damages(primary_damages_dict[elem])}")
 
-                    # 処理後のリストを格納するための新しいリスト
-                    second_related_damages = []
+                    second_related_damages = [process_damage(damage, i) for i, damage in enumerate(sub_related_damages)]
+                    processed_related_damages = process_related_damages(second_related_damages)
 
-                    # リスト内の各要素をループする
-                    for i, damage in enumerate(sub_related_damages):
-                        # コロンの位置を取得
-                        colon_index = damage.find(":")
-                        
-                        if colon_index != -1:
-                            if i == 0:
-                                # 1番目の要素の場合
-                                parts = damage.split(',')
-                                
-                                if len(parts) > 1:
-                                    first_damage = parts[0].split(':')[0]
-                                    after_damage = ':' + parts[1].strip()
-                                    create_damage = first_damage + after_damage
-                                    second_related_damages.append(create_damage)
+                elif first_count < 2 and second_count < 2:
+                    pass
 
-                            else:
-                                # 2つ目以降の要素の場合
-                                parts = damage.split(',')
-                                second_related_damages.append(damage)
-                                
-
-                    # 処理後のリストを格納するための新しいリスト
-                    processed_related_damages = []
-                    #print(f"second_related_damages：{second_related_damages}")
-                    for damage in second_related_damages:
-                        colon_index = damage.find(":")
-                        if colon_index != -1:
-                            before_colon_part = damage[:colon_index].strip()
-                            after_colon_part = damage[colon_index + 1:].strip()
-                            #print(f"damage[colon_index + 1:]：{damage}")
-                            if before_colon_part and after_colon_part:
-                                processed_damage = f"{before_colon_part}:{after_colon_part}"
-                                processed_related_damages.append(processed_damage)
-                    #print(f"after_colon_part：{processed_related_damages}")
-                    
-                elif first_count < 2 and second_count < 2: # {'first': [['横桁 Cr0803']], 'second': [['⑦剥離・鉄筋露出-d']]}
-                    None
-                elif first_count > 1 and second_count < 2: # {'first': [['床版 Ds0201', '床版 Ds0203']], 'second': [['⑦剥離・鉄筋露出-d']]}
-                    first_items_from_first = first_item[1:]
-                    related_damage_list = ','.join(first_items_from_first)# カンマ区切りの文字列に結合
-                    related_second_item = ','.join(second_item)
-                    processed_related_damages.append(f"{related_damage_list}:{related_second_item}")
-                elif first_count < 2 and second_count > 1: # {'first': [['横桁 Cr0503']], 'second': [['⑦剥離・鉄筋露出-d', '⑰その他(分類6:施工不良)-e']]}
-                    second_items_from_second = second_item[1:]
-                    related_damage_list = ','.join(second_items_from_second)# カンマ区切りの文字列に結合
-                    processed_related_damages.append(f"{','.join(elem_name)}:{related_damage_list}")
-                else:#  len(elem_name) > 1 and len(elem_number) > 1: # {'first': [['排水管 Dp0101', '排水管 Dp0102']], 'second': [['①腐食(小大)-c', '⑤防食機能の劣化(分類1)-e']]}
-                    related_damage_list = ','.join(second_item)
-                    processed_related_damages.append(f"{','.join(elem_name)}:{related_damage_list}")
+                else:
+                    if first_count > 1 and second_count < 2:
+                        first_items_from_first = first_item[1:]
+                        related_damage_list = ','.join(first_items_from_first)
+                        related_second_item = ','.join(second_item)
+                    elif first_count < 2 and second_count > 1:
+                        second_items_from_second = second_item[1:]
+                        related_damage_list = ','.join(second_items_from_second)
+                        processed_related_damages = [f"{','.join(elem_name)}:{related_damage_list}"]
+                    else:
+                        related_damage_list = ','.join(second_item)
+                        processed_related_damages = [f"{','.join(elem_name)}:{related_damage_list}"]
 
 
             related_description = ""
@@ -747,10 +668,10 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
         
                 # \n文字列のときの改行文字
         items = {'parts_name': first_item[i], 'damage_name': second_items[i], 'join': first_and_second, 
-                 'picture_number': third, 'this_time_picture': picture_urls, 'last_time_picture': None, 'textarea_content': combined_data, 
+                 'picture_number': third, 'this_time_picture': sub_dis_items, 'last_time_picture': None, 'textarea_content': combined_data, 
                  'damage_coordinate': damage_coordinate[i], 'picture_coordinate': picture_coordinate[i]}
         damage_table.append(items)
-    
+        print("damage_tableの作成にかかった時間_time5: ", time.time() - start5 )
     #優先順位の指定
     order_dict = {"主桁": 1, "横桁": 2, "床版": 3, "PC定着部": 4, "橋台[胸壁]": 5, "橋台[竪壁]": 6, "支承本体": 7, "沓座モルタル": 8, "防護柵": 9, "地覆": 10, "伸縮装置": 11, "舗装": 12, "排水ます": 13, "排水管": 14}
     order_number = {"None": 0, "①": 1, "②": 2, "③": 3, "④": 4, "⑤": 5, "⑥": 6, "⑦": 7, "⑧": 8, "⑨": 9, "⑩": 10, "⑪": 11, "⑫": 12, "⑬": 13, "⑭": 14, "⑮": 15, "⑯": 16, "⑰": 17, "⑱": 18, "⑲": 19, "⑳": 20, "㉑": 21, "㉒": 22, "㉓": 23, "㉔": 24, "㉕": 25, "㉖": 26}
