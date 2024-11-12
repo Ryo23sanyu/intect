@@ -24,8 +24,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-euz(35rb^7_^9(*@mru&95nnwr8v_adfb(2v+vv0!m8!+vro*1"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = True
-DEBUG = False # boto3のコメントアウトは不要
+DEBUG = True
+# DEBUG = False # boto3のコメントアウトは不要
 
 ALLOWED_HOSTS = []
 
@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "accounts.apps.AccountsConfig", # accountアプリ
     "infra.apps.InfraConfig",       # infraアプリ
-    "storages",
+    # "storages",
 ]
 
 MIDDLEWARE = [
@@ -173,12 +173,12 @@ if not DEBUG:
     #下記はファイルのアップロード機能を有する場合のみ
     # MEDIA_ROOT          = "/var/www/{}/media".format(BASE_DIR.name)
 
-    import environ
+    #import environ
 
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    env = environ.Env()
+    # env = environ.Env()
     # 環境変数の強制読み込みを行う
-    environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+    # environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
     
     #DBのアクセス設定
     db_from_env = dj_database_url.config(conn_max_age=600, ssl_require=True)
