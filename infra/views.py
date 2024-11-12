@@ -619,7 +619,6 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
         article = infra.article
         table = Table.objects.filter(infra=infra.id, article=article.id).first()
         #print(table) # 旗揚げチェック：お試し（infra/table/dxf/121_2径間番号違い.dxf）
-        print("かかった時間_time1: ", time.time() - start1 )
         
         start2 = time.time()
         # << 管理サイトに登録するコード（損傷写真帳） >>
@@ -629,8 +628,10 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
         if not split_items_table and not damages_items_table and name_length == 1: # 部材名が1つの場合
             picture_number_index = 0 # 写真番号は0から始める
             for single_damage in damages: 
+                parts_name = names[0]
+                pattern = r"(\d+)$"
                 # parts_nameからパターンにマッチする部分を検索
-                match = re.search(r"(\d+)$", names[0])
+                match = re.search(pattern, parts_name)
                 if match:
                     four_numbers = match.group(1)
                 else:
@@ -1260,8 +1261,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                 damage_obj.save()
                             except IntegrityError:
                                 print("ユニーク制約に違反していますが、既存のデータを更新しませんでした。")
-                                
-        print("かかった時間_time2: ", time.time() - start2 )
+        print("かかった時間_time2: ", time.time() - start2 )                       
     """辞書型の多重リストをデータベースに登録(ここまで)"""
 
     if "search_title_text" in request.GET:
