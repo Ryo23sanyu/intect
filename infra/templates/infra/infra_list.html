@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}橋梁一覧{% endblock title %}
+{% block h1 %}橋梁一覧{% endblock %}
+
+<link rel="stylesheet" href="sidebar.css">
+<!-- 並び替え用のプルダウンメニュー -->
+<label for="order_by">並び替え：</label>
+<select id="order_by" name="order_by" onchange="handleOrderChange()">
+  <option value="span_number">径間数</option>
+  <option value="length">橋長</option>
+  <option value="full_width">全幅員</option>
+</select>
+
+{% block content %}
+<div class="mt-3">
+  <a href="{% url 'create-infra' article_id %}" class="btn btn-primary">橋梁登録</a>
+</div>
+<div class="d-flex flex-wrap">
+
+    {% for item in object_list %} {# forループでitemには各infraが格納されている #} 
+    <div class="p-4 m-4 bg-light border border-success rounded" style="width: 19rem;">
+        <h2 class="text-success">{{ item.title }}</h2><br>
+        <h6 class="card-text">径間数：{{ item.径間数 }} 径間</h6>
+        <h6 class="card-text">橋長　：{{ item.橋長 }} m</h6>
+        <h6 class="card-text">全幅員：{{ item.全幅員 }} m</h6>
+        <div class="mt-3">
+          {# path('article/<int:article_pk>/infra/<int:pk>/detail/',) #}
+          {# article_pkとpkの2つの引数を設定する必要がある。#}
+          <a href="{% url 'detail-infra' article_id item.pk %}" class="btn btn-primary">詳細</a>
+
+            {# infraに紐付いているtableのリンクを全て表示する。（逆参照を使用）#}
+            {# Infra(1) Table(多) の状態で Infraに紐づくすべてのTableを取り出す方法 #}
+            {# Table(models)にForeignKeyをつけた時点で紐付きが発生する #}
+                {# item.table_set #}
+                {# item は Infraのオブジェクト。item.table_set.all でInfraに紐づくTableをすべて取り出せる。 #}
+            {# オブジェクト.多側のモデルの小文字.set.all で逆参照ができる #}
+
+            {% for table in item.table_set.all %} {# オブジェクト.多側のモデルの小文字.set.all で逆参照ができる #}
+            <a href="{% url 'bridge-table' article_id item.pk %}" class="btn btn-primary">損傷写真帳</a>
+            <a href="{% url 'observations-list' article_id item.pk %}" class="btn btn-primary">所見</a>
+            {% endfor %}
+
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+  function handleOrderChange() {
+              // プルダウンメニューが変更されたときの処理をここに追加
+              var orderSelect = document.getElementById("order_by");
+              var selectedValue = orderSelect.value;
+
+              // 選択された値を使って何かしらの処理を行う（例：Ajaxでデータを取得するなど）
+              console.log("選択された値: ", selectedValue);
+          }
+  var sidebar = document.querySelector('.sidebar');
+  var sidebarToggle = document.querySelector('.sidebar-toggle');
+
+  sidebarToggle.addEventListener('click', function() {
+              sidebar.classList.toggle('open');
+          });
+</script>
+
+{% endblock content %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}{{ object.title }}{% endblock title %}
+{% block h1 %}案件一覧{% endblock %}
+
+{% block content %}
+  <div class="p-4 m-4 bg-light border border-success rounded">
+    <h2 class="text-success">{{ object.案件名 }}</h2>
+      <p>土木事務所：{{ object.土木事務所 }}</p>
+      <p>対象数：{{ object.対象数 }}橋</p>
+      <p>担当者名：{{ object.担当者名 }}</p>
+      <p>その他：{{ object.その他 }}</p>
+      <a href="{% url 'list-infra' object.pk %}" class="btn btn-primary">対象一覧</a>
+      <a href="{% url 'update-article' object.pk %}" class="btn btn-primary">編集</a>
+      <a href="{% url 'delete-article' object.pk %}" class="btn btn-primary">削除</a>
+      <h6 class="card-title">{{ object.category }}</h6>
+  </div>
+{% endblock content %}

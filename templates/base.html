@@ -1,0 +1,327 @@
+{% load static %}
+
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <title>{% block title %}{% endblock title %}| インテクト</title>
+    <!--
+    <script src="https://cdn.datatables.net/fixedcolumns/5.0.0/js/fixedColumns.dataTables.js"></script>
+    <script src="https://cdn.datatables.net/rowreorder/1.5.0/js/rowReorder.dataTables.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    -->
+
+    <!-- Style リソース -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <link href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/2.0.3/css/dataTables.dataTables.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/fixedcolumns/5.0.0/css/fixedColumns.dataTables.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/rowreorder/1.5.0/css/rowReorder.dataTables.css" rel="stylesheet">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="{% static 'infra/css/style.css' %}">
+    
+    <!-- JavaScript リソース -->
+    <script src="https://code.jquery.com/jquery-3.7.1.js" defer></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js" defer></script>
+    <script src="https://cdn.datatables.net/fixedcolumns/5.0.0/js/dataTables.fixedColumns.js" defer></script>
+    <script src="https://cdn.datatables.net/rowreorder/1.5.0/js/dataTables.rowReorder.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://stuk.github.io/jszip/dist/jszip.min.js"></script>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <Style>
+      .my-table th, .my-table td {
+          border: 3px double dimgray; /* ボーダースタイルを設定 */
+          padding: 8px; /* セルの内側の余白を設定 */
+      }
+      .center-align {
+          text-align: center;
+      }
+      .center-align img,
+      .center-align textarea {
+          margin: auto; /* 水平中央寄せ */
+          display: block; /* ブロックレベル要素として扱う */
+      }
+      .account-form-group {
+        margin-bottom: 20px;
+      }
+      .account-form-group label {
+        display: block;
+        margin-bottom: 5px;
+      }
+      .account-form-group input {
+        width: 150%;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      .account-form-group button {
+        width: auto;
+        padding: 10px 20px;
+      }
+      .account-form .btn {
+        display: block;
+        margin: auto;
+      }
+  </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-dark bg-success sticky-top">
+      <div class="navbar-nav d-flex flex-row">
+        {% if user.is_authenticated %}
+        <a class="nav-link mx-3" href="{% url 'accounts:my_page'%}">マイページ</a>
+        {% endif %}
+        <a class="nav-link mx-3" href="{% url 'list-article' %}">案件一覧</a>
+        <a class="nav-link mx-3" href="{% url 'upload' %}">アップロード</a>
+      </div>
+      <div class="navbar-nav d-flex flex-row">
+      {% if request.user.is_authenticated %}
+        <a class="nav-link mx-3" href="{% url 'index' %}">使用方法</a>
+        <a class="nav-link mx-3" href="{% url 'accounts:logout' %}">ログアウト</a>
+        {% if user.is_superuser %}
+        <a class="nav-link mx-3" href="/admin/">管理画面</a>
+        {% endif %}
+      {% else %}
+          <a class="nav-link mx-3" href="{% url 'index' %}">使用方法</a>
+          <a class="nav-link mx-3" href="{% url 'accounts:login' %}">ログイン</a>
+          <a class="nav-link mx-3" href="{% url 'accounts:signup' %}">会員登録</a>
+        {% endif %}
+      </div>
+    </nav>
+    <div class='p-4'>
+    <h1>{% block h1 %}{% endblock %}</h1>  
+    {% block content %}{% endblock content %}
+    </div>
+  </body>
+
+  <div class="sidebar">
+    <p>インテクト</p>
+    <ul>
+      {% if object.article.pk and object.pk %}
+        <li><a href="{% url 'list-infra' object.article.pk %}">橋梁一覧</a></li>{# 橋梁一覧 #}
+        <li><a href="{% url 'detail-infra' object.article.pk object.pk %}">橋梁緒言</a></li>{# その1 #}
+        <li>✕全景写真</a></li>{# その3 #}
+        <li><a href="{% url 'number-list' object.article.pk object.pk %}">番号登録</a></li>{# その4 #}
+        <li>✕所見まとめ</a></li>{# その6 #}
+        <li><a href="{% url 'observations-list' object.article.pk object.pk %}">所見一覧</a></li>{# その7・8 #}
+        <li>✕損傷図</a></li>{# その9 #}
+        <li><a href="{% url 'bridge-table' object.article.pk object.pk %}">損傷写真</a></li>{# その10 #}
+        {% comment %} <li><a href="{% url 'file-upload' object.article.pk object.pk %}">アップロード</a></li> {% endcomment %}
+        <li><a id="excel_download" href="{% url 'excel-output' object.article.pk object.pk %}">エクセル出力</a></li>
+        {# <li><a id="dxf_download" href="{% if table.dxf %}{{ table.dxf.url }}{% endif %}">dxfデータ出力</a></li> #}
+        {% comment %} <li><a id="dxf_download" href="{% url 'dxf-output' object.article.pk object.pk %}">dxfデータ出力</a></li> {% endcomment %}
+        {# ↓をクリックした時、↑2つをクリックしたことにするJavaScriptを用意する。(dxfファイルが無い場合、このボタンは機能しない。) #}
+        <li><button id="double_download">ファイル出力</button></li>
+      {% endif %}
+        <script>
+          const double_download = document.querySelector("#double_download");
+  
+          double_download.addEventListener("click", () => {
+              document.querySelector("#excel_download").click();
+              document.querySelector("#dxf_download").click();
+              console.log("click");
+          });
+        </script>
+      
+        <div>案件番号: {{ object.article.pk }}</div>
+        <div>橋梁番号: {{ object.pk }}</div>
+    </ul>
+    <div class="sidebar-toggle">
+      <button class="btn btn-primary">＜</button>
+    </div>
+  </div>
+
+  <script>
+      //　スクロール位置を保存
+      window.addEventListener('beforeunload', () => {
+          localStorage.setItem('scrollPosition', window.scrollY);
+      });
+
+      window.addEventListener('load', () => {
+          const scrollPosition = localStorage.getItem('scrollPosition');
+          if (scrollPosition !== null) {
+              window.scrollTo(0, parseInt(scrollPosition, 10));
+              localStorage.removeItem('scrollPosition');
+          }
+      });
+          $(document).ready(function () {
+              new DataTable('.my-table', {
+                  fixedColumns: true,
+                  "order": [],
+              });
+          });
+
+      function updatePlaceholder(select) {
+          var input = document.getElementById('input_'+select.name.split('_')[1]); // 対応するinput要素を取得
+          if (select.value === "width") {
+              input.placeholder = "mm"; // 幅が選択された場合のプレースホルダー
+          } else if (select.value === "area") {
+              input.placeholder = "mm"; // 面積が選択された場合のプレースホルダー
+          } else if (select.value === "bolt") {
+            input.placeholder = "本"; // 本数が選択された場合のプレースホルダー
+          } else if (select.value === "level") {
+            input.placeholder = "mm"; // 段差量が選択された場合のプレースホルダー
+          } else {
+              input.placeholder = "単位"; // デフォルトのプレースホルダー
+          }
+      }
+      {% comment %} document.addEventListener('DOMContentLoaded', (event) => {
+        // 名称ごとに対応番号を定義したオブジェクト
+        const namedConditions = {
+          '排水管': ['①', '②', '③', '④'],
+          '主桁': ['①', '⑤', '⑥'],
+          '床版': ['②', '③', '④', '⑦']
+        };
+      
+        // 全ての行を走査
+        const rows = document.querySelectorAll('tr');
+        rows.forEach(row => {
+          // 名称と情報を含む<td>タグを取得
+          const nameCell = row.querySelector('.sorting_1');
+          const infoCell = row.querySelectorAll('td')[1];
+      
+          // 名称に対応する条件を取得
+          const supportedNumbers = namedConditions[nameCell.textContent];
+      
+          // 条件に適合しない内容が含まれているかチェック
+          if (supportedNumbers && infoCell) {
+            const content = infoCell.innerHTML;
+            let unsupported = supportedNumbers.every(number => !content.includes(number));
+            
+            // 対応できない内容が含まれている場合、修正案を表示
+            if (unsupported) {
+              console.log(`${nameCell.textContent}: 対応できない番号が含まれています。`);
+              // ここで修正案を表示する処理を行う（例: alertやHTML内にメッセージを挿入）
+      
+              const div       = document.createElememt("div");
+              div.textContent = "対応できません";
+      
+              nameCell.appendChild(div);
+      
+            } 
+          }
+        });
+      }); {% endcomment %}
+
+      {% comment %} $(function () {
+          // "変更"ボタンのクリックイベントに対する処理
+          $('body').on('click', '[id^=fileSelect-]', function () {
+            // body要素内で、id属性がfileSelect-で始まる全ての要素に対して、clickイベントが発生した時の処理を紐付け
+              var index = this.id.split('-')[1];
+                // クリックされた要素(this)のid属性値をハイフン(-)で分割し、2番目の部分（配列のインデックス1）を変数indexに格納
+              $('#upload-file-' + index).click();
+                // 対応するinput[type=file]要素を選択し、upload-fileのclick動作を実行します。これにより、ファイル選択ダイアログが表示
+          });
+      
+          // ファイルが選択されたときの処理
+          $('body').on('change', '[id^=upload-file-]', function () {
+            // body要素内で、id属性がupload-file-で始まる全ての要素に対して、changeイベントが発生した時の処理を紐付け
+              var index = this.id.split('-')[2];
+                // イベントが発生した要素のid属性を3つ目のハイフンで分割して、その後の部分を取得
+              var fileInput = '#upload-file-' + index;
+                // 対応するファイル入力のセレクタを組み立て
+              var imgTag = '#uploaded-image-' + index;
+                // 対応する画像タグのセレクタを組み立て
+
+              var file = $(fileInput).prop('files')[0];
+                // fileInputセレクタで選択された要素の、filesプロパティから最初のファイルを取得
+              if (!file) return;
+                // ファイルが選択されていなければ終了(return)
+
+              if (confirm('写真を変更しますか？')) {
+                // ダイアログを表示
+                  var fd = new FormData();
+                    // FormDataオブジェクトを変数fdで作成
+                  fd.append('upload-file', file);
+                    // 選択されたファイルを変数fdに追加
+
+                  // ファイルをサーバに送信
+                  $.ajax({
+                      url: '{% url "ajax_file_send" %}', // 送信先のURL (DjangoのURL設定に依存します)
+                      type: 'POST',
+                      data: fd,
+                      processData: false,
+                      contentType: false,
+                      dataType: 'json',
+                      // 送信成功時の処理
+                      success: function (response) {
+                          if(response.filePath) {
+                              $(fileButton).val(response.filePath); // レスポンスからfilePathを取得し、ボタンのvalueを更新
+                          }
+                      }
+                  });
+
+                  var reader = new FileReader();
+                  reader.onload = function (e) { // ファイルの読み込みが完了したらこの関数が呼ばれる
+                      $(imgTag).attr('src', e.target.result); // 読み込んだファイルの内容（画像データ）を<img>タグのsrc属性に設定
+                  };
+                  reader.readAsDataURL(file); // 選択されたファイルをDataURLとして読み込み
+              }
+          });
+      }); {% endcomment %}
+      
+
+      function getCookie(name) {
+          var cookieValue = null;
+          if (document.cookie && document.cookie !== '') {
+              var cookies = document.cookie.split(';');
+              for (var i = 0; i < cookies.length; i++) {
+                  var cookie = jQuery.trim(cookies[i]);
+                  // Does this cookie string begin with the name we want?
+                  if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                      cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                      break;
+                  }
+              }
+          }
+          return cookieValue;
+      }
+      
+      var csrftoken = getCookie('csrftoken');
+      
+      function csrfSafeMethod(method) {
+          // these HTTP methods do not require CSRF protection
+          return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+      }
+      
+      $.ajaxSetup({
+          beforeSend: function (xhr, settings) {
+              if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                  xhr.setRequestHeader("X-CSRFToken", csrftoken);
+              }
+          }
+      });
+      var sidebar = document.querySelector('.sidebar');
+      var sidebarToggle = document.querySelector('.sidebar-toggle');
+    
+      sidebarToggle.addEventListener('click', function() {
+                  sidebar.classList.toggle('open');
+              });
+              
+              function stickySidebar() {
+                var sidebar = document.querySelector('.sidebar');
+                var sidebarTop = sidebar.getBoundingClientRect().top;
+                var windowTop = window.pageYOffset || document.documentElement.scrollTop;
+              
+                if (windowTop > sidebarTop && windowTop > 0) {
+                  sidebar.style.position = 'fixed';
+                  // サイドバーの位置やスタイルを調整する必要がある場合は、適宜追加の処理を行ってください
+                } else {
+                  // sidebar.style.position = 'static';
+                  // サイドバーの位置やスタイルを調整する必要がある場合は、適宜追加の処理を行ってください
+                }
+              }
+              
+              // スクロールイベントを監視して、サイドバーの位置を動的に変更する
+              window.addEventListener('scroll', function() {
+                stickySidebar();
+              });
+              
+  </script>
+</html>

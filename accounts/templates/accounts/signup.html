@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}アカウント作成{% endblock title %}
+{% block h1 %}アカウント作成{% endblock %}
+
+{% block content %}
+<style>
+  .form-group {
+      margin-bottom: 20px;
+  }
+  .form-group-label-input {
+      display: flex;
+      align-items: center;
+  }
+  .form-group-label-input label {
+      width: 150px; /* ラベルの固定幅を設定 */
+      margin-right: 10px; /* 入力欄との間にスペースを設定 */
+      text-align: left; /* ラベルのテキストを右揃え */
+  }
+  .form-group-label-input .form-field {
+      width: 200px;
+      padding: 8px;
+      box-sizing: border-box;
+  }
+  .form-group .help-text {
+      color: #6c757d; /* 注意事項の色を設定 */
+      font-size: 13px; /* 注意事項のフォントサイズを設定 */
+      margin-top: 5px; /* 入力欄との間にスペースを設定 */
+  }
+  .form-group .btn {
+      display: block;
+      margin: auto;
+  }
+  </style>
+  <form method="post" class="p-4 m-4 bg-light border border-success rounded account-form-group">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="form-group">
+        <div class="form-group-label-input">
+          {{ field.label_tag }}
+          <div class="form-field">
+            {{ field }}
+          </div>
+        </div>
+        <div class="help-text">
+          {{ field.help_text }}
+        </div>
+      </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-success m-2">アカウント作成</button>
+  </form>
+
+{% endblock content %}

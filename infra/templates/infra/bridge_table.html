@@ -1,0 +1,484 @@
+<!-- table.html -->
+{% extends "base.html" %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}損傷一覧{% endblock title %}
+{% block h1 %}損傷一覧{% endblock %}
+
+{% block content %}
+
+
+{# ここで径間ボタンを生成 #}
+<form action="{% url 'bridge-table' article_pk object.pk %}">
+    {% for button in buttons %}
+    <button name="search_title_text" value="{{ forloop.counter }}径間">{{ forloop.counter }}径間</button>
+    {% endfor %}
+</form>
+{# HTMLのtableタグのルールとして、table系のタグ以外(formタグなど)が使われた時、中の要素だけ外に追い出される。 #}
+<table class="my-table" border="1">
+    <thead>
+        <tr>
+            <th>損傷状況</th>
+            <th>損傷写真</th>
+        </tr>
+    </thead>
+    <tbody id="sortable">
+        {% for group in grouped_data %}
+        <tr>
+                {% csrf_token %}
+                <td>
+                    <div style="border: 1px solid black; padding: 5px; margin-bottom: 10px; width: 450px;">
+                        {% for bridge in group %}
+
+                            {% ifchanged %} <!-- 前のループと違う値の場合に出力 -->
+                                <span style="background-color: Pink;">{{ bridge.parts_name }}</span> <!-- first項目に色付け -->
+                                <br>
+                            {% endifchanged %}
+
+                            {{ bridge.damage_name }}
+                            {% if "NON-a" not in bridge.damage_name %} <!-- NON-aを含まない場合 -->
+                                <br>
+                                <div style="display: flex; gap: 5px; align-items: center;">
+                                <select id="measurement-{{ bridge.id }}" name="measurement" placeholder="名称" onChange="updateUnit(this, '{{ bridge.id }}')" style="height:30px; resize: none;">{{ bridge.damage_size|default:"" }}
+                                    <option value=""></option>
+                                    <option value="width" {% if bridge.measurement == 'width' %}selected{% endif %}>幅</option>
+                                    <option value="area" {% if bridge.measurement == 'area' %}selected{% endif %}>面積</option>
+                                    <option value="bolt" {% if bridge.measurement == 'bolt' %}selected{% endif %}>本数</option>
+                                    <option value="level" {% if bridge.measurement == 'level' %}selected{% endif %}>段差量</option>                            
+                                </select>
+                                <textarea type="text" id="damage_size-{{ bridge.id }}"    name="damage_size"    placeholder="数量" style="height:30px; width: 130px; resize: none;">{{ bridge.damage_size|default:"" }}</textarea> {% comment %} overflow-x: scroll; white-space: nowrap; {% endcomment %}
+                                <textarea type="text" id="unit-{{ bridge.id }}"                                 placeholder="単位" style="height:30px; width: 60px; resize: none;"></textarea>
+                                <textarea type="text" id="classification-{{ bridge.id }}" name="classification" placeholder="分類" style="height:30px; width: 60px; resize: none;">{{ bridge.classification|default:"" }}</textarea>
+                                <textarea type="text" id="pattern-{{ bridge.id }}"        name="pattern"        placeholder="パターン" style="height:30px; width: 100px; resize: none;">{{ bridge.pattern|default:"" }}</textarea>
+                                </div>
+                            {% else %}
+                            <br>
+                            {% endif %}
+
+                        {% endfor %}
+                        <br>
+                        {% for bridge in group %}
+                        {% if forloop.first %}
+                            <input type="hidden" name="parts_name" value="{{ bridge.parts_name }}">
+                            <input type="hidden" name="damage_name" value="{{ bridge.damage_name }}">
+                            <input type="hidden" name="coords" value="{{ bridge.damage_coordinate_x }},{{ bridge.damage_coordinate_y }}">
+                            <input type="hidden" name="new_text">
+                            <input type="hidden" name="join" value="{{ bridge.join }}">
+                            <button type="button" onclick="openModal( '{{ bridge.id }}','{{ bridge.table.id }}','{{ bridge.damage_coordinate_x }},{{ bridge.damage_coordinate_y }}' )">変更</button>
+                                                            <!-- openModal()のときに各変更ボタンの一意なidと座標をscriptに渡す-->
+                            <button type="button" onclick="deleteData(this)">削除</button>
+                            {% comment %} <p>ボタンID{{bridge.id}}/テーブルID{{bridge.table.id}}</p> {% endcomment %}
+                        {% endif %}
+                        {% endfor %}
+                        {% comment %} <form method="POST" action="{% url 'edit_report_data' bridge.id %}" class="edit-form">
+                            {% csrf_token %}
+                        </form> {% endcomment %}
+                    </div>
+                </td>
+            {% for bridge in group %}
+            {% if forloop.first %}
+            <td class="center-align">
+                <ul class="vert"> 
+                    {% for entry in picture_data %}
+                    {% if entry.full_report.id == group.0.id %}
+                    {% for picture in entry.matches %}
+
+                        <ul class="side">
+                            <li style="top-bottom: 5px; margin-bottom: 5px;"> <!-- ここで下部の空間を指定 -->
+                                <div style="position: relative; display: flex; align-items: center;"> <!--align-items: center; 縦の中央に配置<div style="display: flex; align-items: center;"> -->
+                                    <div style="position: relative;">
+                                        <div style="position: absolute; top: 0px; left: -50px; background-color: none; color: black; padding: 2px 5px; font-size: 12px; border: 1px solid grey; width: 50px; height: 30px; overflow: hidden;">
+                                            {% comment %} {% for number in bridge.picture_number|split_comma %} {% endcomment %}
+                                            <textarea type="number" id="picture_number-{{ bridge.id }}" name="picture_number" style="border: none; width: 100%; height: 100%; resize: none; overflow: hidden;">{{ picture.picture_number }}</textarea> <!-- 番号を表示し編集可能にする -->
+
+                                        </div>{% comment %} src="{{ picture|remove_prefix:'/infra/static' }}" {% url 'serve_image' picture %} strip:先頭と末尾から空白を取り除く {% endcomment %}
+                                            <img id="uploaded-image-{{ forloop.parentloop.counter }}-{{ forloop.counter }}" src="{{ picture.image }}" width="200" height="150" style="margin:0 10px;">
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; justify-content: center;"> <!--justify-content: center; ボタンを縦の中央に配置-->
+                                        <input type="file" style="display: none" onchange="uploadPicture(this, {{ bridge.id }})" accept="image/*">
+                                        <button type="button" onclick="changePicture(this, {{ bridge.id }}, '{{ picture.strip }}')" style="margin-bottom: 10px;">変更</button>
+                                        <button type="button" onclick="addPicture(this, {{ bridge.id }})" style="margin-bottom: 10px;">追加</button>
+                                        <button type="button" onclick="deletePicture(this, {{ bridge.id }}, '{{ picture.strip }}')" style="margin-bottom: 10px;">削除</button> <!--縦文字に変更-->
+                                    </div>
+                                </div>
+                            </li>
+                            <li style="top-bottom: 5px; margin-bottom: 5px;"> <!-- ここで下部の空間を指定 -->
+                                <div style="display: flex; align-items: center;"> <!--align-items: center; 縦の中央に配置-->
+                                    <div>
+                                    {% if bridge.last_time_picture is None %}
+                                        <img id="before-image" src="{% static 'infra/noImage.png' %}" width="200" height="150" style="margin:0 10px; border: 1px solid grey;">
+                                    {% else %}
+                                        <img id="before-image" src="{% static bridge.last_time_picture %}" width="200" height="150" style="margin:0 10px; border: 1px solid grey;">
+                                    {% endif %}
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; justify-content: center;"> <!--justify-content: center; ボタンを縦の中央に配置-->
+                                        <input id="upload-file" name="upload-file" type="file" style="display: none">
+                                        <button id="fileSelect" type="button" style="margin-bottom: 10px;" value="{% static item %}">変更</button>
+                                        <!--<button id="fileSelect" type="button" style="margin-bottom: 10px;" value="{% static item %}">変更</button>-->
+                                        <!--<button style="margin-bottom: 10px;">変更</button> bottom(下方向)に10pxの間隔を空ける-->
+                                        <button>削除</button>
+                                    </div>
+                                </div>
+                            </li>
+                            <li style="top-bottom: 5px; margin-bottom: 5px;"> <!-- ここで下部の空間を指定 -->
+                                {% spaceless %}
+                                    {% if bridge.textarea_content %} <!-- damage_tableのforループ(bridge)とviews.pyのtextarea_content-->
+                                        <textarea name="notes" rows="6" style="margin:0 10px;">{{ bridge.textarea_content|safe }}</textarea>
+                                    {% else %}
+                                        <textarea name="notes" rows="6" style="margin:0 10px;" placeholder="写真メモを入力してください。"></textarea>
+                                    {% endif %}
+                                {% endspaceless %}
+                            </li>
+                        </ul>
+                    {% endfor %}
+                    {% endif %}
+                    {% endfor %}
+                    
+                </ul>
+            
+            </td>
+            {% endif %}
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- カスタムモーダル -->
+<div id="customModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.5); justify-content:center; align-items:center;">
+    <div style="background-color:white; padding:20px; border-radius:5px; max-width:600px; width:90%;">
+        <h2>変更内容</h2>
+        <p style="margin: 0;">編集前</p>
+        <textarea id="beforeChange" placeholder="変更前" style="width:100%; height:100px;"></textarea>
+        <p style="margin: 0;">編集後</p>
+        <textarea id="afterChange" placeholder="変更後" style="width:100%; height:100px;"></textarea>
+        <button type="button" onclick="closeModal()">閉じる</button>
+        <button type="button" id="saveButton">保存</button>
+    </div>
+</div>
+
+<script>
+// 保存ボタンを押さなくてもデータを保存する(リアルタイム保存)
+$(document).ready(function() {
+    // AJAXリクエストを送信する関数
+    function saveField(fieldName, fieldValue, itemId) {
+        $.ajax({
+            type: 'POST',
+            url: "/update_full_report_data/" + itemId + "/",
+            data: {
+                [fieldName]: fieldValue, // フィールド名をキーとして使用
+                'csrfmiddlewaretoken': '{{ csrf_token }}'
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    console.log(fieldName + "を保存しました。");
+                } else {
+                    console.log(fieldName + "の保存時にエラーが発生しました。");
+                    console.log(response.errors);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error(fieldName + "の保存時にエラーが発生しました。サーバ側のエラーなどを確認してください。");
+            }
+        });
+    }
+
+    // 各フィールドにイベントリスナーを追加
+    $('textarea[name="damage_size"], textarea[name="measurement"], textarea[name="classification"], textarea[name="pattern"]').on('input', function() {
+        let fieldValue = $(this).val(); // フィールドの入力値を取得
+        let fieldName = $(this).attr('name');  // フィールド名を取得（damage_size、measurementなど）
+        let itemId = $(this).attr('id').split('-')[1];  // IDの形式が `fieldname-itemId` であると仮定
+        console.log(`Sending data: fieldName=${fieldName}, fieldValue=${fieldValue}, itemId=${itemId}`);
+        saveField(fieldName, fieldValue, itemId);
+    });
+
+    // select 要素にもイベントリスナーを追加
+    $('select[name="measurement"]').on('change', function() {
+        let fieldValue = $(this).val(); // 選択された値を取得
+        let fieldName = $(this).attr('name');  // フィールド名を取得（measurement）
+        let itemId = $(this).attr('id').split('-')[1];  // IDの形式が `fieldname-itemId` であると仮定
+        console.log(`Sending data: fieldName=${fieldName}, fieldValue=${fieldValue}, itemId=${itemId}`);
+        saveField(fieldName, fieldValue, itemId);
+    });
+});
+// 写真の変更
+function changePicture(button, bridgeId, oldPicturePath) { //引数としてボタン要素、橋のID、古い画像のパスを取得
+    let fileInput = button.previousElementSibling; //ボタンの直前にあるファイル入力要素を取得
+    fileInput.click(); //ファイル選択ダイアログを表示
+    fileInput.onchange = function(event) { //ファイルが選択されたときに実行されるイベントリスナーを定義
+        let formData = new FormData(); //選択されたファイルをフォームデータに追加
+        formData.append('file', fileInput.files[0]); //フォームデータオブジェクトを作成
+        formData.append('action', 'change'); //実行するアクションとして 'change' を追加
+        formData.append('bridgeId', bridgeId); //橋のIDをフォームデータに追加
+        formData.append('oldPicturePath', oldPicturePath); //古い画像のパスをフォームデータに追加
+
+        //URLに対して動作を実行
+        fetch("{% url 'upload-picture' article_pk=article_pk pk=object.pk %}", {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        }).then(response => response.json())
+          .then(data => {
+              if(data.success) {
+                  //location.reload(); //画像の変更が成功したらページをリロード(一旦リロードなし)
+              } else {
+                  alert('Failed to change picture');
+              }
+          });
+    }
+}
+// 写真の追加
+function addPicture(button, bridgeId) {
+    let fileInput = button.previousElementSibling;
+    fileInput.click();
+    fileInput.onchange = function(event) {
+        let formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('action', 'add');
+        formData.append('bridgeId', bridgeId);
+
+        fetch("{% url 'upload-picture' article_pk=article_pk pk=object.pk %}", {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        }).then(response => response.json())
+          .then(data => {
+              if(data.success) {
+                  location.reload();
+              } else {
+                  alert('Failed to add picture');
+              }
+          });
+    }
+}
+// 写真の削除
+function deletePicture(button, bridgeId, picturePath) {
+    if(confirm("Are you sure you want to delete this picture?")) {
+        let formData = new FormData();
+        formData.append('action', 'delete');
+        formData.append('bridgeId', bridgeId);
+        formData.append('picturePath', picturePath);
+
+        fetch("{% url 'upload-picture' article_pk=article_pk pk=object.pk %}", {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        }).then(response => response.json())
+          .then(data => {
+              if(data.success) {
+                  location.reload();
+              } else {
+                  alert('Failed to delete picture');
+              }
+          });
+    }
+}
+
+// 写真番号を保存
+document.addEventListener('DOMContentLoaded', function() {
+    const textareas = document.querySelectorAll('textarea[name="picture_number"]');
+    textareas.forEach((textarea) => {
+        textarea.addEventListener('change', function() {
+            const pictureId = this.id.split('-')[1];  // IDからbridge.idを取得
+            const newValue = this.value;
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/update_picture_number/');
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('X-CSRFToken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        console.log(xhr.responseText);
+                    } else {
+                        console.error('Failed to update');
+                    }
+                }
+            };
+
+            xhr.send(JSON.stringify({ 'bridge_id': pictureId, 'new_value': newValue }));
+        });
+    });
+});
+
+
+// カスタムモーダル
+function openModal(damage_pk, table_pk, coords) {
+    console.log("オープン・ザ・モーダル");
+    console.log(coords)
+
+    document.getElementById('customModal').style.display = 'flex';
+
+    // ここで ビューに対して、`current_text`の値を手に入れる。
+    // 
+    const url = "/bridge_table_edit/" + damage_pk + "/" + table_pk + "/";
+    console.log("Generated URL: ", url); // ここで出力
+    // 保存時にも使う変数を一時的に保管
+    sessionStorage.setItem('damage_pk', damage_pk);
+    sessionStorage.setItem('table_pk', table_pk);
+    sessionStorage.setItem('coords', coords);
+    // ↑のURLに対して、リクエストを送る
+    /*
+    Ajaxの種類
+    - jQueryのAjax :　jQueryの機能に含まれている
+    - XMLHttpRequest : 素のJavaScriptによるAjax(JavaScriptによるリクエストの送信)。エラーハンドリング(エラー対処)が難しい。コードが複雑になる。
+    - FetchAPI : ↑XMLHttpRequestの改良型。エラーハンドリングがわかりやすくなった。   
+    */
+   
+    // 1: Ajax専用のビューを用意する(current_textを返すビューを作る)。JsonResponseを返す
+    // 2: ↑のビューに対して、リクエストを送信する。
+
+    var formData = new FormData();
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    formData.append("coords", coords);
+
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log("Fetch data: ", data); // data の追加ログ
+        console.log("Fetch data: ", data.status);
+        if (data.status === 'success') {
+            // 特定のパターンを削除する関数
+            function removeSpecificPatterns(str) {
+                // \pt2750; や \ptz; のようなパターンを削除
+                return str.replace(/\\pt[\d\w]+;/g, '');
+            }
+            // 改行を \P に変換した後の文字列を取得
+            const replacedText = data.current_text.replace(/\\P/g, '\n');
+            // 特定のパターンを削除
+            const cleanedText = removeSpecificPatterns(replacedText);
+            // 帰ってきたcurrent_text を使って、モーダルの要素に、textを貼り付ける。
+            document.querySelector("#beforeChange").value = cleanedText;
+            document.querySelector("#afterChange").value = cleanedText;
+        } else {
+            console.error('Response was not successful:', data); // エラーログの追加
+            alert('失敗しました');
+        }
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+    });
+}
+
+function saveChanges() {
+    console.log("修正開始");
+    // 保存していた変数を取得
+    const damage_pk = sessionStorage.getItem('damage_pk');
+    const table_pk = sessionStorage.getItem('table_pk');
+    const coords = sessionStorage.getItem('coords');
+
+    const afterChange = document.getElementById('afterChange').value;
+    const url = "/bridge_table_send/" + damage_pk + "/" + table_pk + "/";
+    console.log("Generated URL: ", url); // ここで出力
+    console.log(coords)
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken') // DjangoでCSRFトークンをセットする関数
+        },
+        body: JSON.stringify({ 
+            new_text: afterChange,
+            coords: coords
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            // エラーレスポンスの場合
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if(data.status === 'success') {
+            alert('変更が保存されました。');
+            closeModal();
+            // ページをリロード
+            window.location.reload();
+        } else {
+            alert('エラーが発生しました。');
+        }
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+        alert('エラーが発生しました。');
+    });
+}
+
+document.getElementById('saveButton').addEventListener('click', saveChanges);
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function closeModal() {
+    document.getElementById('customModal').style.display = 'none';
+}
+
+// 背景クリックを検知してモーダルを閉じるロジック
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('customModal');
+    
+    // モーダルをクリックした場合は閉じない
+    modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+
+});
+// 単位を自動で入力
+function updateUnit(selectElem, bridgeId) {
+    var unitElem = document.getElementById('unit-' + bridgeId);
+    switch (selectElem.value) {
+        case 'width':
+            unitElem.value = 'mm';
+            break;
+        case 'area':
+            unitElem.value = 'mm';
+            break;
+        case 'bolt':
+            unitElem.value = '本';
+            break;
+        case 'level':
+            unitElem.value = 'mm';
+            break;
+        default:
+            unitElem.value = '';
+    }
+}
+// 初期値の設定
+document.addEventListener("DOMContentLoaded", function() {
+    {% for group in grouped_data %}
+        {% for bridge in group %}
+            var selectElem = document.getElementById('measurement-{{ bridge.id }}');
+            updateUnit(selectElem, {{ bridge.id }});
+        {% endfor %}
+    {% endfor %}
+});
+</script>
+
+{% endblock content %}
