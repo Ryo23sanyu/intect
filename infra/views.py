@@ -411,7 +411,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
     # AWSクライアントを作成
     s3 = boto3.client('s3')
     
-    bucket_name = 'intection' # infraprojectから変更(リージョンの変更)
+    bucket_name = 'infraprotect'
     print(bucket_name)
     folder_name = article.案件名+"/"
     print(folder_name)
@@ -428,7 +428,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
 
     # 結果を表示
     for obj_key in matched_objects:
-        encode_dxf_filename = f"https://{bucket_name}.s3.us-east-1.amazonaws.com/{obj_key}"
+        encode_dxf_filename = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{obj_key}"
     
     dxf_filename = urllib.parse.quote(encode_dxf_filename, safe='/:') # スラッシュとコロン以外をエンコード
 
@@ -1360,7 +1360,7 @@ def handle_uploaded_file(f):
 
 # << 写真の変更内容を反映 >>
 def upload_picture(request, article_pk, pk):
-    bucket_name = "intection" # infraprojectから変更(リージョンの変更)
+    bucket_name = "infraprotect"
     
     article = get_object_or_404(FullReportData, id=article_pk)
     print(article)
@@ -1439,7 +1439,7 @@ def observations_list(request, article_pk, pk):
     # table = Table.objects.filter(id=pk).first()
     print(f"table_name:{table}")
 
-    bucket_name = 'intection' # infraprojectから変更(リージョンの変更)
+    bucket_name = 'infraprotect'
     print(bucket_name)
     folder_name = article.案件名+"/"
     print(folder_name)
@@ -1456,7 +1456,7 @@ def observations_list(request, article_pk, pk):
 
     # 結果を表示
     for obj_key in matched_objects:
-        encode_dxf_filename = f"https://{bucket_name}.s3.us-east-1.amazonaws.com/{obj_key}"
+        encode_dxf_filename = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{obj_key}"
     
     dxf_filename = urllib.parse.quote(encode_dxf_filename, safe='/:') # スラッシュとコロン以外をエンコード
 
@@ -2006,7 +2006,7 @@ def excel_output(request, article_pk, pk):
     app = xw.App(visible=False)
     print("3")
     # wb = app.books.open(file_stream)
-    # bucket_name = 'intection' # infraprojectから変更(リージョンの変更)
+    # bucket_name = 'infraprotect'
     # エクセルファイルを読み込む
     # s3 = boto3.client('s3')
     # response = s3.get_object(Bucket=bucket_name, Key="H31_bridge_base.xlsm")

@@ -314,7 +314,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
         start4 = time.time()
         s3 = boto3.client('s3')
 
-        bucket_name = 'intection' # infraprojectから変更(リージョンの変更)
+        bucket_name = 'infraprotect'
         article_folder_name = table.article.案件名
         infra_folder_name = table.infra.title
 
@@ -343,7 +343,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
             found_keys = search_s3_objects(bucket_name, prefix, pattern)
             result = []
             for found_key in found_keys:
-                object_url = f"https://{bucket_name}.s3.us-east-1.amazonaws.com/{found_key}"
+                object_url = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{found_key}"
                 encode_dxf_filename = urllib.parse.quote(object_url, safe='/:')
                 result.append(encode_dxf_filename)
             return result
