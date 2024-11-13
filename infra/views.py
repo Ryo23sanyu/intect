@@ -428,7 +428,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
 
     # 結果を表示
     for obj_key in matched_objects:
-        encode_dxf_filename = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{obj_key}"
+        encode_dxf_filename = f"https://{bucket_name}.s3.us-east-1.amazonaws.com/{obj_key}"
     
     dxf_filename = urllib.parse.quote(encode_dxf_filename, safe='/:') # スラッシュとコロン以外をエンコード
 
@@ -1456,7 +1456,7 @@ def observations_list(request, article_pk, pk):
 
     # 結果を表示
     for obj_key in matched_objects:
-        encode_dxf_filename = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{obj_key}"
+        encode_dxf_filename = f"https://{bucket_name}.s3.us-east-1.amazonaws.com/{obj_key}"
     
     dxf_filename = urllib.parse.quote(encode_dxf_filename, safe='/:') # スラッシュとコロン以外をエンコード
 
