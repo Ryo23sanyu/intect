@@ -1086,7 +1086,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                         print(f"damage_name4:{original_damage_name}")
                         parts_split = process_names(flatten(parts_name))
                         # print(f"this_time:{this_time_picture}")
-                        list_in_picture = this_time_picture.split(",")
+                        space_in_list_picture = this_time_picture.split(",")
+                        list_in_picture = [list_in_picture.strip() for list_in_picture in space_in_list_picture] # 写真リスト各要素のスペースを削除
                         picture_number_index = 0 # インデックス番号のリセット
                         # for single_picture in list_in_picture:
                         update_fields = {
@@ -1130,7 +1131,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                 if numbers_only is not None and numbers_only != '':
                                     # print(f"images：{images}")
                                     for absolute_image_path in images:
-                                        # print(f"absolute_image_path：{absolute_image_path}")
+                                        print(f"absolute_image_path：{absolute_image_path}")
                                         try:
                                         # with open(absolute_image_path, 'rb') as image_file:
                                             #print(f"保存前：{numbers_only}")

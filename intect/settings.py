@@ -24,8 +24,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-euz(35rb^7_^9(*@mru&95nnwr8v_adfb(2v+vv0!m8!+vro*1"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-#DEBUG = True
-DEBUG = False # boto3のコメントアウトは不要
+DEBUG = True
+#DEBUG = False # boto3のコメントアウトは不要
 
 ALLOWED_HOSTS = []
 
@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "accounts.apps.AccountsConfig", # accountアプリ
     "infra.apps.InfraConfig",       # infraアプリ
-    "storages", # pip install django-storages
+    #"storages", # pip install django-storages
 ]
 
 MIDDLEWARE = [
