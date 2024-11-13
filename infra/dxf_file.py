@@ -40,7 +40,7 @@ def find_square_around_text(article_pk, pk, dxf_filename, search_title_text, sec
     infra = Infra.objects.filter(id=pk).first()
     
     # << S3からdxfファイルのダウンロード >>
-    bucket_name = 'infraprotect'
+    bucket_name = 'intection' # infraprojectから変更(リージョンの変更)
     object_key = f'{article.案件名}/{infra.title}/{infra.title}.dxf'
     
     # ファイルパスにファイル名を含める

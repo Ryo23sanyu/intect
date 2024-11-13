@@ -411,7 +411,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
     # AWSクライアントを作成
     s3 = boto3.client('s3')
     
-    bucket_name = 'infraprotect'
+    bucket_name = 'intection' # infraprojectから変更(リージョンの変更)
     print(bucket_name)
     folder_name = article.案件名+"/"
     print(folder_name)
@@ -1360,7 +1360,7 @@ def handle_uploaded_file(f):
 
 # << 写真の変更内容を反映 >>
 def upload_picture(request, article_pk, pk):
-    bucket_name = "infraprotect"
+    bucket_name = "intection" # infraprojectから変更(リージョンの変更)
     
     article = get_object_or_404(FullReportData, id=article_pk)
     print(article)
@@ -1381,7 +1381,7 @@ def upload_picture(request, article_pk, pk):
             print(bridge.this_time_picture)
             
             old_picture_path = request.POST.get('oldPicturePath')
-            new_picture_path = f"https://{bucket_name}.s3.amazonaws.com/{object_name}"
+            new_picture_path = request.POST.get('newPicturePath')
             # もし、↑と↓のprint文で変わらないのであれば、このreplaceに問題がある。
             
             print("変更する動作")
@@ -1396,7 +1396,6 @@ def upload_picture(request, article_pk, pk):
                 return JsonResponse({'success': True})
             else:
                 return JsonResponse({'success': False, 'message': 'Failed to upload to S3'})
-
 
         elif action == 'add':
             new_picture_path = handle_uploaded_file(request.FILES['file'])
@@ -1440,7 +1439,7 @@ def observations_list(request, article_pk, pk):
     # table = Table.objects.filter(id=pk).first()
     print(f"table_name:{table}")
 
-    bucket_name = 'infraprotect'
+    bucket_name = 'intection' # infraprojectから変更(リージョンの変更)
     print(bucket_name)
     folder_name = article.案件名+"/"
     print(folder_name)
@@ -2007,7 +2006,7 @@ def excel_output(request, article_pk, pk):
     app = xw.App(visible=False)
     print("3")
     # wb = app.books.open(file_stream)
-    # bucket_name = 'infraprotect'
+    # bucket_name = 'intection' # infraprojectから変更(リージョンの変更)
     # エクセルファイルを読み込む
     # s3 = boto3.client('s3')
     # response = s3.get_object(Bucket=bucket_name, Key="H31_bridge_base.xlsm")
@@ -2423,17 +2422,18 @@ def excel_output(request, article_pk, pk):
     # 並び替え
     sorted_records = sorted(no1112_records, key=custom_sort_key)
     span = 1
-    i11, i12 = 0, 0
+    i11, i12, i13 = 0, 0, 0
     initial_row11, initial_row12 = 10, 10 # 1つ目の入力位置
 
     for record in sorted_records:
         # print(f"出力レコード:{record}")
         # print(f"　径間:{span}")
-        if int(record.span_number) == span + 1:
+        if int(record.span_number) == span + 1: # 径間が増えるとき
             span = int(record.span_number)
             initial_row11 = initial_row11 + 18 * math.ceil(i11 / 18) # 10+18×(ページ数)
             initial_row12 = initial_row12 + 18 * math.ceil(i12 / 18) # 10,28,46(+18)
-            i11, i12 = 0, 0
+            initial_row13 = initial_row13 + 28 * math.ceil(i13 / 18) # 10,38,66(+28)
+            i11, i12, i13 = 0, 0, 0
         if int(record.span_number) == span:
             if record.main_parts == "〇":
                 ws = wb['その１１']

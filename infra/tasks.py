@@ -314,7 +314,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
         start4 = time.time()
         s3 = boto3.client('s3')
 
-        bucket_name = 'infraprotect'
+        bucket_name = 'intection' # infraprojectから変更(リージョンの変更)
         article_folder_name = table.article.案件名
         infra_folder_name = table.infra.title
 
