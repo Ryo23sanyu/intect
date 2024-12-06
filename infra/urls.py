@@ -30,6 +30,9 @@ urlpatterns = [
     # << 損傷写真帳 >>
     path('article/<int:article_pk>/infra/<int:pk>/bridge-table/', views.bridge_table, name='bridge-table'),# 損傷写真帳の作成
     path('article/<int:article_pk>/infra/<int:pk>/bridge-table/upload/', views.upload_picture, name='upload-picture'),# 写真の変更を管理サイトに反映
+    #　<< 旗揚げの内容を編集 >>
+    path('bridge_table_edit/<int:damage_pk>/<int:table_pk>/', views.edit_report_data, name='edit_report_data'), # 旗揚げの内容を受信
+    path('bridge_table_send/<int:damage_pk>/<int:table_pk>/', views.edit_send_data, name='edit_send_data'), # 旗揚げの修正内容を送信
     # << 所見一覧 >>
     path('article/<int:article_pk>/infra/<int:pk>/observations/', views.observations_list, name='observations-list'),# 所見一覧の作成
     path('damage_comment_edit/<int:pk>/', views.damage_comment_edit , name="damage_comment_edit"),# 所見コメントを管理サイトに保存

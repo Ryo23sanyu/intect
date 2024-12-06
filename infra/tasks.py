@@ -63,7 +63,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
         extracted = []  # 空のリストを用意
         removed_elements = []  # バックアップ用リスト
 
-        pattern = r'[\u2460-\u3256]'  # ⓵～㉖
+        pattern = r'[\u2460-\u3256]' # ⓵～㉖
 
         for list_item in data:  # list_item変数に要素を代入してループ処理
             # print(list_item)
@@ -98,24 +98,28 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
     for text, removed in zip(extracted_text, removed_elements):  # 1つずつのリスト
         result_list = []
         for item in text:# 1つずつの要素
+            print(item)
         # 各条件を個別に確認する
             space_exists = re.search(r"\s+", item) is not None # スペースを含む
             alpha_exists = re.search(r"[a-zA-Z]+", item) is not None # アルファベットを含む
             digits_exists = re.search(r"\d{2,}", item) is not None # 2桁以上の数字を含む
         
-            if space_exists and alpha_exists and digits_exists:
+            if space_exists and alpha_exists and digits_exists and "mm" not in item:
             # 新しいdetail項目を作成し、resultsに追加します
                 current_detail = {'detail': item, 'items': []}
+                print(f"current_date：{current_detail}")
                 result_list.append(current_detail)
             
             else:
             # 既存のdetailのitemsに現在の項目を追加
-                if current_detail is not None:
+                if current_detail is not None and "mm" not in item:
                     current_detail['items'].append(item)
+                    print(f"current_detail['items']：{current_detail['items']}")
                 
     # 元の要素を結果に追加
         for elem in removed:
             result_list.append(elem)
+            print(f"result_list：{result_list}")
 
     #print(result_list)
         first_item.append(result_list)
@@ -267,7 +271,10 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
             result_items.append(item)
 
     def remove_parentheses_from_list(last):
+        print(f"last：{last}")
         pattern = re.compile(r"\([^()]*\)")
+        for string in last:
+            print(string)
         result = [pattern.sub("", string) for string in last]
         return result
 
@@ -308,7 +315,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
 
         name_and_wildcardnumber = [item + ".jpg" for item in time_result]
         # ['9月8日 佐藤*/*117.jpg', '9月8日 佐藤*/*253.jpg']
-        print("写真の検索にかかった時間_time3: ", time.time() - start3 )
+        # print("写真の検索にかかった時間_time3: ", time.time() - start3 )
         
         # << S3にアップロードした写真のワイルドカード検索 >>
         start4 = time.time()
@@ -354,7 +361,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
             for future in as_completed(future_to_search):
                 search_results = future.result()
                 sub_dis_items.extend(search_results)
-        print("写真のリスト追加にかかった時間_time4: ", time.time() - start4 )
+        # print("写真のリスト追加にかかった時間_time4: ", time.time() - start4 )
         
 # << ◆写真メモを作成するコード◆ >>
         start5 = time.time()
@@ -565,6 +572,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
             described_list = []
             
             for damage in unified_request_list:
+                print(f"unified_request_list：{unified_request_list}")
                 if damage in replacement_patterns: # 辞書に一致する場合は登録文字を表示
                     described_list.append(replacement_patterns[damage])
                 elif damage.startswith('⑰'): # 17の場合はカッコの中を表示
@@ -666,21 +674,29 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
         # print(combined_data)
         # print(f"picture_urls：{picture_urls}")
         
+        if len(first_item[i]) > 0:
                 # \n文字列のときの改行文字
-        items = {'parts_name': first_item[i], 'damage_name': second_items[i], 'join': first_and_second, 
-                 'picture_number': third, 'this_time_picture': sub_dis_items, 'last_time_picture': None, 'textarea_content': combined_data, 
-                 'damage_coordinate': damage_coordinate[i], 'picture_coordinate': picture_coordinate[i]}
+            items = {'parts_name': first_item[i], 'damage_name': second_items[i], 'join': first_and_second, 
+                    'picture_number': third, 'this_time_picture': sub_dis_items, 'last_time_picture': None, 'textarea_content': combined_data, 
+                    'damage_coordinate': damage_coordinate[i], 'picture_coordinate': picture_coordinate[i]}
+            
+            print(f"各フィールドのitems：{items}")
         damage_table.append(items)
-        print("damage_tableの作成にかかった時間_time5: ", time.time() - start5 )
+        # print("damage_tableの作成にかかった時間_time5: ", time.time() - start5 )
     #優先順位の指定
-    order_dict = {"主桁": 1, "横桁": 2, "床版": 3, "PC定着部": 4, "橋台[胸壁]": 5, "橋台[竪壁]": 6, "支承本体": 7, "沓座モルタル": 8, "防護柵": 9, "地覆": 10, "伸縮装置": 11, "舗装": 12, "排水ます": 13, "排水管": 14}
+    order_dict = {"主桁": 1, "横桁": 2, "縦桁": 3, "床版": 4, "対傾構": 5, "上横構": 6, "下横構": 7, "外ケーブル": 8, "ゲルバー部": 9, "PC定着部": 10, 
+                  "格点": 11, "コンクリート埋込部": 12, "その他": 13, "橋脚[柱部・壁部]": 14, "橋脚[梁部]": 15, "橋脚[隅角部・接合部]": 16, "橋台[胸壁]": 17, "橋台[竪壁]": 18, "橋台[翼壁]": 19, "基礎[フーチング]": 20,
+                  "基礎": 21, "支承本体": 22, "アンカーボルト": 23, "沓座モルタル": 24, "台座コンクリート": 25, "落橋防止システム": 26, "高欄": 27, "防護柵": 28, "地覆": 29, "中央分離帯": 30, 
+                  "伸縮装置": 31, "遮音施設": 32, "照明施設": 33, "縁石": 34, "舗装": 35, "排水ます": 36, "排水管": 37, "点検施設": 38, "添架物": 39, "袖擁壁": 40}
     order_number = {"None": 0, "①": 1, "②": 2, "③": 3, "④": 4, "⑤": 5, "⑥": 6, "⑦": 7, "⑧": 8, "⑨": 9, "⑩": 10, "⑪": 11, "⑫": 12, "⑬": 13, "⑭": 14, "⑮": 15, "⑯": 16, "⑰": 17, "⑱": 18, "⑲": 19, "⑳": 20, "㉑": 21, "㉒": 22, "㉓": 23, "㉔": 24, "㉕": 25, "㉖": 26}
     order_lank = {"a": 1, "b": 2, "c": 3, "d": 4, "e": 5}
             
     # <<◆ リストの並び替え ◆>>
     def sort_key_function(sort_item):
-        first_value = sort_item['parts_name'][0][0] # firstキーの最初の要素
-        #print(first_value) # 主桁 Mg0901
+        print(f"sort_item['parts_name']：{sort_item['parts_name']}")
+        if len(sort_item['parts_name']) > 0:
+            first_value = sort_item['parts_name'][0][0] # firstキーの最初の要素
+            print(f"first_value：{first_value}") # 主桁 Mg0901
 
         if " " in first_value:
             # 部材記号の前にスペースが「含まれている」場合

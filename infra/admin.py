@@ -48,11 +48,13 @@ admin.site.register(NameEntry, NameEntryAdmin)
 
 class DamageListAdmin(admin.ModelAdmin): # 損傷一覧
     list_display = ('parts_name', 'number', 'damage_name', 'damage_lank', 'span_number', 'infra')
+    search_fields = ('parts_name', 'infra__title', 'article__案件名') # 検索対象：「infraのtitleフィールド」と指定
     ordering = ('-span_number', '-infra')
 admin.site.register(DamageList, DamageListAdmin)
 
 class BridgePictureAdmin(admin.ModelAdmin): # 写真登録
     list_display = ('infra', 'parts_split', 'damage_name', 'picture_number', 'image', 'image_tag', 'span_number', 'article')
+    search_fields = ('parts_split', 'infra__title', 'article__案件名') # 検索対象：「infraのtitleフィールド」と指定
     # 管理サイトに写真を表示する方法
     def image_tag(self, obj):
         if obj.image:
@@ -65,7 +67,10 @@ admin.site.register(BridgePicture, BridgePictureAdmin)
 class FullReportDataAdmin(admin.ModelAdmin): # 損傷写真帳の全データ
     list_display = ('parts_name', 'four_numbers', 'damage_name', 'picture_number', 'span_number', 'infra', 'article')
     search_fields = ('parts_name', 'infra__title', 'article__案件名') # 検索対象：「infraのtitleフィールド」と指定
-    parts_name_order = ['主桁', '横桁', '床版', 'PC定着部', '橋台[胸壁]', '橋台[竪壁]', '橋台[翼壁]', '支承本体', '沓座モルタル', '防護柵', '地覆', '伸縮装置', '舗装', '排水ます', '排水管']
+    parts_name_order = ['主桁', '横桁', '縦桁', '床版', '対傾構', '上横構', '下横構', '外ケーブル', 'ゲルバー部', 'PC定着部', '格点', 'コンクリート埋込部', 'その他', 
+                        '橋脚[柱部・壁部]', '橋脚[梁部]', '橋脚[隅角部・接合部]', '橋台[胸壁]', '橋台[竪壁]', '橋台[翼壁]', '基礎[フーチング]', '基礎', 
+                        '支承本体', 'アンカーボルト', '沓座モルタル', '台座コンクリート', '落橋防止システム', 
+                        '高欄', '防護柵', '地覆', '中央分離帯', '伸縮装置', '遮音施設', '照明施設', '縁石', '舗装', '排水ます', '排水管', '点検施設', '添架物', '袖擁壁']
     damage_name_order = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳', '㉑', '㉒', '㉓', '㉔', '㉕', '㉖']
 
     def get_ordering(self, request):
@@ -110,8 +115,44 @@ class CustomPartsNameFilter(admin.SimpleListFilter):
         return [
             ('主桁', '主桁'),
             ('横桁', '横桁'),
+            ('縦桁', '縦桁'),
             ('床版', '床版'),
-            ('排水管', '排水管')
+            ('対傾構', '対傾構'),
+            ('上横構', '上横構'),
+            ('下横構', '下横構'),
+            ('外ケーブル', '外ケーブル'),
+            ('ゲルバー部', 'ゲルバー部'),
+            ('PC定着部', 'PC定着部'),
+            ('格点', '格点'),
+            ('コンクリート埋込部', 'コンクリート埋込部'),
+            ('その他', 'その他'),
+            ('橋脚[柱部・壁部]', '橋脚[柱部・壁部]'),
+            ('橋脚[梁部]', '橋脚[梁部]'),
+            ('橋脚[隅角部・接合部]', '橋脚[隅角部・接合部]'),
+            ('橋台[胸壁]', '橋台[胸壁]'),
+            ('橋台[竪壁]', '橋台[竪壁]'),
+            ('橋台[翼壁]', '橋台[翼壁]'),
+            ('基礎[フーチング]', '基礎[フーチング]'),
+            ('基礎', '基礎'),
+            ('支承本体', '支承本体'),
+            ('アンカーボルト', 'アンカーボルト'),
+            ('沓座モルタル', '沓座モルタル'),
+            ('台座コンクリート', '台座コンクリート'),
+            ('落橋防止システム', '落橋防止システム'),
+            ('高欄', '高欄'),
+            ('防護柵', '防護柵'),
+            ('地覆', '地覆'),
+            ('中央分離帯', '中央分離帯'),
+            ('伸縮装置', '伸縮装置'),
+            ('遮音施設', '遮音施設'),
+            ('照明施設', '照明施設'),
+            ('縁石', '縁石'),
+            ('舗装', '舗装'),
+            ('排水ます', '排水ます'),
+            ('排水管', '排水管'),
+            ('点検施設', '点検施設'),
+            ('添架物', '添架物'),
+            ('袖擁壁', '袖擁壁')
         ]
 
     def queryset(self, request, queryset):
@@ -122,7 +163,7 @@ class CustomPartsNameFilter(admin.SimpleListFilter):
 class DamageCommentAdmin(admin.ModelAdmin): # 所見データ
     list_display = ('parts_name', 'parts_number', 'damage_name', 'number', 'infra', 'span_number', 'article')
     list_filter = (CustomPartsNameFilter,)
-    search_fields = ('replace_name__icontains',)
+    search_fields = ('replace_name__icontains', 'infra__title', 'article__案件名')
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
