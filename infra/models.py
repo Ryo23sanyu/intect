@@ -196,6 +196,10 @@ class FullReportData(models.Model):
     damage_size = models.CharField(max_length=255, null=True, blank=True) # 100×100
     classification = models.CharField(max_length=255, null=True, blank=True) # 分類「1」
     pattern = models.CharField(max_length=255, null=True, blank=True) # パターン「6」
+    excel_parts_name = models.CharField(max_length=255, null=True, blank=True) # エクセル出力（部材名称）
+    excel_parts_number = models.CharField(max_length=255, null=True, blank=True) # エクセル出力（部材番号）
+    excel_damage_name = models.CharField(max_length=255, null=True, blank=True) # エクセル出力（損傷名称）
+    excel_damage_lank = models.CharField(max_length=255, null=True, blank=True) # エクセル出力（損傷判定）
     infra = models.ForeignKey(Infra, verbose_name="Infra", on_delete=models.CASCADE)
     article = models.ForeignKey(Article, on_delete=models.CASCADE)
     table = models.ForeignKey(Table, on_delete=models.CASCADE)

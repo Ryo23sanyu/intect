@@ -420,18 +420,20 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
     print(folder_name)
     pattern = f'*{infra.title}*/{infra.title}.dxf'
     print(pattern)
-
+    sub_obj_key = f"{article.案件名}/{infra.title}/{infra.title}.dxf"
+    print(sub_obj_key)
+    
     # 該当するオブジェクトを取得
     matched_objects = match_s3_objects_with_prefix(bucket_name, folder_name, pattern)
 
     if matched_objects:
         print(f"該当オブジェクト：{matched_objects}")
+        # 結果を表示
+        for obj_key in matched_objects:
+            encode_dxf_filename = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{obj_key}"
     else:
+        encode_dxf_filename = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{sub_obj_key}" # 「*」を含めない
         print("ファイルが見つかりません")
-
-    # 結果を表示
-    for obj_key in matched_objects:
-        encode_dxf_filename = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{obj_key}"
     
     dxf_filename = urllib.parse.quote(encode_dxf_filename, safe='/:') # スラッシュとコロン以外をエンコード
 
@@ -496,29 +498,29 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
         picture_number = damage_data.get('picture_number', '')
         # 正規表現で数字のみを抽出
         if picture_number:
-            print(f"picture_number：{picture_number}")
+            #print(f"picture_number：{picture_number}")
             # 数字のみを抽出
             before_numbers_only = re.findall(r'\d+', str(picture_number)) # ['2']  ['2','3']
-            print(f"リスト型番号:{before_numbers_only}")
+            #print(f"リスト型番号:{before_numbers_only}")
             # カウンターに基づいて処理を行う
-            print(index_counter)
+            #print(index_counter)
             if index_counter == 0:
                 picture_number_box = []
                 
             if len(before_numbers_only) > 1: # リストに要素がある場合(写真番号が書かれている場合)
                 for number in before_numbers_only: # 1つずつの番号に分解
-                    print(f"{index_counter}番目の要素: {number}")
+                    #print(f"{index_counter}番目の要素: {number}")
                     picture_number_box.append(number)
                     index_counter += 1
                 index_counter = 0
-                print(picture_number_box)
+                #print(picture_number_box)
             else:
                 picture_number_box = []
                 index_counter = 0
 
             # ↓　インデックスを左に移動した（当初はelseの中）
             numbers_only = before_numbers_only[index_counter] # カウンターに対応する数字を取得
-            print(f"オンリーナンバーズ（抽出後）: {numbers_only}")
+            #print(f"オンリーナンバーズ（抽出後）: {numbers_only}")
             picture_number_box.append(numbers_only)
             # ↑　同じ
         else:
@@ -538,7 +540,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
         names = damage_data.get('parts_name', '')
         damages = damage_data.get('damage_name', '')
         #print(f"names:{names}")
-        print(f"damages:{damages}")
+        #print(f"damages:{damages}")
         
         split_names = []
 
@@ -644,8 +646,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                 else:
                     four_numbers = "00"
                 damage_name = flatten(single_damage)
-                print(f"parts_name1:{parts_name}") # 主桁 Mg0101
-                print(f"damage_name1:{damage_name}") # ㉓変形・欠損-c
+                #print(f"parts_name1:{parts_name}") # 主桁 Mg0101
+                #print(f"damage_name1:{damage_name}") # ㉓変形・欠損-c
                 parts_split = process_names(flatten(parts_name))
                 # print(f"this_time:{this_time_picture}")
                 list_in_picture = this_time_picture.split(",")
@@ -665,6 +667,10 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                         'picture_coordinate_y': picture_coordinate_y,
                         'span_number': span_number,
                         'special_links': '/'.join([str(parts_split), str(damage_name), str(span_number)]),
+                        'excel_parts_name': print(parts_name[:parts_name.find(" ")]),
+                        'excel_parts_number': four_numbers,
+                        'excel_damage_name': damage_name[1:-2] if len(damage_name) > 3 else None,
+                        'excel_damage_lank': damage_name[-1] if damage_name[-2] == "-" else None,
                         'infra': infra,
                         'article': article,
                         'table': table
@@ -720,7 +726,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                         return re.sub(r'[A-Za-z]+', '', match.group())
                                             
                                     joined_picture_damage_name = FullReportData.objects.filter(damage_coordinate_x=damage_coordinate_x, damage_coordinate_y=damage_coordinate_y, table=table, infra=infra, article=article)
-                                    print(f"joined_picture_damage_name：{joined_picture_damage_name}")
+                                    #print(f"joined_picture_damage_name：{joined_picture_damage_name}")
                                     
                                     loop_change = True
                                     full_damaged_name = ""
@@ -794,8 +800,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                     else:
                         four_numbers = "00"
                     damage_name = flatten(damages[0])
-                    print(f"parts_name2:{parts_name}")
-                    print(f"damage_name2:{damage_name}")
+                    #print(f"parts_name2:{parts_name}")
+                    #print(f"damage_name2:{damage_name}")
                     parts_split = process_names(flatten(parts_name))
                     # print(f"this_time:{this_time_picture}")
                     list_in_picture = this_time_picture.split(",")
@@ -815,6 +821,10 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                             'picture_coordinate_y': picture_coordinate_y,
                             'span_number': span_number,
                             'special_links': '/'.join([str(parts_split), str(damage_name), str(span_number)]),
+                            'excel_parts_name': print(parts_name[:parts_name.find(" ")]),
+                            'excel_parts_number': four_numbers,
+                            'excel_damage_name': damage_name[1:-2] if len(damage_name) > 3 else None,
+                            'excel_damage_lank': damage_name[-1] if damage_name[-1] == "-" else None,
                             'infra': infra,
                             'article': article,
                             'table': table
@@ -943,8 +953,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                         else:
                             four_numbers = "00"
                         damage_name = flatten(damage)
-                        print(f"parts_name3:{parts_name}")
-                        print(f"damage_name3:{damage_name}")
+                        #print(f"parts_name3:{parts_name}")
+                        #print(f"damage_name3:{damage_name}")
                         parts_split = process_names(flatten(parts_name))
                         # print(f"this_time:{this_time_picture}")
                         list_in_picture = this_time_picture.split(",")
@@ -964,6 +974,10 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                 'picture_coordinate_y': picture_coordinate_y,
                                 'span_number': span_number,
                                 'special_links': '/'.join([str(parts_split), str(damage_name), str(span_number)]),
+                                'excel_parts_name': print(parts_name[:parts_name.find(" ")]),
+                                'excel_parts_number': four_numbers,
+                                'excel_damage_name': damage_name[1:-2] if len(damage_name) > 3 else None,
+                                'excel_damage_lank': damage_name[-1] if damage_name[-1] == "-" else None,
                                 'infra': infra,
                                 'article': article,
                                 'table': table
@@ -1084,7 +1098,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
             picture_number_index = 0
             for i in range(name_length):
                 for name in split_names[i]:
-                    print(f"forループ前：{damages[i]}")
+                    #print(f"forループ前：{damages[i]}")
                     for damage in damages[i]:
                         parts_name = name
                         
@@ -1095,9 +1109,9 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                         else:
                             four_numbers = "00"
                         original_damage_name = flatten(damage)
-                        print(f"parts_name4:{parts_name}")
-                        print(flatten(damage))
-                        print(f"damage_name4:{original_damage_name}")
+                        #print(f"parts_name4:{parts_name}")
+                        #print(flatten(damage))
+                        #print(f"damage_name4:{original_damage_name}")
                         parts_split = process_names(flatten(parts_name))
                         # print(f"this_time:{this_time_picture}")
                         space_in_list_picture = this_time_picture.split(",")
@@ -1119,6 +1133,10 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                             'picture_coordinate_y': picture_coordinate_y,
                             'span_number': span_number,
                             'special_links': '/'.join([str(parts_split), str(original_damage_name), str(span_number)]),
+                            'excel_parts_name': print(parts_name[:parts_name.find(" ")]),
+                            'excel_parts_number': four_numbers,
+                            'excel_damage_name': str(original_damage_name)[1:-2] if len(str(original_damage_name)) > 3 else None,
+                            'excel_damage_lank': str(original_damage_name)[-1] if str(original_damage_name)[-1] == "-" else None,
                             'infra': infra,
                             'article': article,
                             'table': table
@@ -1144,10 +1162,10 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                 # BridgePictureモデルに保存
                                 try:
                                     if numbers_only is not None and numbers_only != '':
-                                        print(f"numbers_only:{numbers_only}")
+                                        #print(f"numbers_only:{numbers_only}")
                                         # print(f"images：{images}")
                                         for absolute_image_path in images:
-                                            print(f"absolute_image_path：{absolute_image_path}")
+                                            #print(f"absolute_image_path：{absolute_image_path}")
                                             try:
                                             # with open(absolute_image_path, 'rb') as image_file:
                                                 #print(f"保存前：{numbers_only}")
@@ -1162,7 +1180,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                                 else:
                                                     current_picture_number = None
                                                     
-                                                print(f"保存後：{current_picture_number}")
+                                                #print(f"保存後：{current_picture_number}")
                                                 #print("---------")
                                                 if current_picture_number is None: # 写真がない
                                                     join_picture_damage_name = BridgePicture.objects.filter(damage_coordinate_x=damage_coordinate_x, damage_coordinate_y=damage_coordinate_y, table=table, infra=infra, article=article)
@@ -1190,7 +1208,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                                     # マッチした文字列からアルファベット部分を削除
                                                     return re.sub(r'[A-Za-z]+', '', match.group())
                                                 joined_picture_damage_name = FullReportData.objects.filter(damage_coordinate_x=damage_coordinate_x, damage_coordinate_y=damage_coordinate_y, table=table, infra=infra, article=article)
-                                                print(f"joined_picture_damage_name：{joined_picture_damage_name.first()}")
+                                                #print(f"joined_picture_damage_name：{joined_picture_damage_name.first()}")
                                                 
                                                 loop_change = True
                                                 full_damaged_name = ""
@@ -1464,19 +1482,21 @@ def observations_list(request, article_pk, pk):
     folder_name = article.案件名+"/"
     print(folder_name)
     pattern = f'*{infra.title}*/{infra.title}.dxf'
-    print(pattern)
+    print(pattern)        
+    sub_obj_key = f"{article.案件名}/{infra.title}/{infra.title}.dxf"
+    print(sub_obj_key)
     
     # 該当するオブジェクトを取得
     matched_objects = match_s3_objects_with_prefix(bucket_name, folder_name, pattern)
 
     if matched_objects:
         print(f"該当オブジェクト：{matched_objects}")
+        # 結果を表示
+        for obj_key in matched_objects:
+            encode_dxf_filename = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{obj_key}"
     else:
+        encode_dxf_filename = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{sub_obj_key}" # 「*」を含めない
         print("ファイルが見つかりません")
-
-    # 結果を表示
-    for obj_key in matched_objects:
-        encode_dxf_filename = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{obj_key}"
     
     dxf_filename = urllib.parse.quote(encode_dxf_filename, safe='/:') # スラッシュとコロン以外をエンコード
 
@@ -1574,10 +1594,14 @@ def observations_list(request, article_pk, pk):
                 damage_name = report_data.damage_name.split('-')[0] if '-' in report_data.damage_name else report_data.damage_name
                 if damage_name == "NON":
                     damage_name = damage_name
-                elif damage_name[0] != '⑰':
+                elif damage_name[0] != '⑰': #　(17)以外
                     damage_name = number_change[damage_name[0]]
-                else:
-                    damage_name = damage_name[1:] # ⑦剥離・鉄筋露出から先頭の一文字を省く
+                else: # (17)の場合
+                    pattern = r'\(.*?\:'
+                    result_1 = re.sub(pattern, '', damage_name)
+                    result_2 = re.sub("⑰その他", '', result_1[:-1])
+                    damage_name = f"その他({result_2})"
+                    # damage_name = damage_name[1:] # 先頭の一文字を省く
 
                 damage_lank = report_data.damage_name.split('-')[1] if '-' in report_data.damage_name else report_data.damage_name
                 
@@ -1590,7 +1614,7 @@ def observations_list(request, article_pk, pk):
                     material = damage_list_materials[:-1], # 最後のコンマが不要なため[-1:]（S,C）
                     main_parts = "〇" if part.main_frame else "", # 主要部材のフラグ
                     damage_name = damage_name, # 剥離・鉄筋露出
-                    damage_lank = damage_lank, # d
+                    damage_lank = damage_lank[-1] if len(damage_lank) > 0 else damage_lank, # d
                     span_number = part.span_number,
                     infra = part.infra,
                     article = part.article
@@ -1786,8 +1810,8 @@ def observations_list(request, article_pk, pk):
                 defaults={
                     'material': data['material'],
                     'main_parts': data['main_parts'],
-                    'damage_max_lank': damage_max_lank,
-                    'damage_min_lank': damage_min_lank,
+                    'damage_max_lank': damage_max_lank[-1] if len(damage_max_lank) > 0 else damage_max_lank,
+                    'damage_min_lank': damage_min_lank[-1] if len(damage_min_lank) > 0 else damage_min_lank,
                     'this_time_picture': before_combined_pictures
                 }
             )

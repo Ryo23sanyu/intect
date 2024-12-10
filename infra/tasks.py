@@ -56,7 +56,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
                 # 次の位置の要素を削除
                 extracted_text.remove(next_data)
     # extracted_text = [['主桁 Mg0101', '①-d', '写真番号-00', 'defpoints'], ['主桁 Mg0902', '⑦-c', '写真番号-00', 'defpoints']]
-    print("位置要素を取得")
+    #print("位置要素を取得")
 # ↓　インデックスを1つ左に移動した(return sorted_items以外)
     # それぞれのリストから文字列のみを抽出する関数(座標以外を抽出)
     def extract_text(data):
@@ -90,7 +90,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
 
     # 関数を使って特定の部分を抽出
     extracted_text, removed_elements = extract_text(extracted_text)
-    print("特定の要素を抽出")
+    #print("特定の要素を抽出")
     
     first_item = []
     current_detail = None  # 現在処理しているdetailを追跡
@@ -98,7 +98,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
     for text, removed in zip(extracted_text, removed_elements):  # 1つずつのリスト
         result_list = []
         for item in text:# 1つずつの要素
-            print(item)
+            #print(item)
         # 各条件を個別に確認する
             space_exists = re.search(r"\s+", item) is not None # スペースを含む
             alpha_exists = re.search(r"[a-zA-Z]+", item) is not None # アルファベットを含む
@@ -107,24 +107,24 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
             if space_exists and alpha_exists and digits_exists and "mm" not in item:
             # 新しいdetail項目を作成し、resultsに追加します
                 current_detail = {'detail': item, 'items': []}
-                print(f"current_date：{current_detail}")
+                #print(f"current_date：{current_detail}")
                 result_list.append(current_detail)
             
             else:
             # 既存のdetailのitemsに現在の項目を追加
                 if current_detail is not None and "mm" not in item:
                     current_detail['items'].append(item)
-                    print(f"current_detail['items']：{current_detail['items']}")
+                    #print(f"current_detail['items']：{current_detail['items']}")
                 
     # 元の要素を結果に追加
         for elem in removed:
             result_list.append(elem)
-            print(f"result_list：{result_list}")
+            #print(f"result_list：{result_list}")
 
     #print(result_list)
         first_item.append(result_list)
     
-    print(f"first_item：{first_item}")
+    #print(f"first_item：{first_item}")
     extracted_text = first_item
         
     sub_first_item = [] 
@@ -152,7 +152,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
                 first_sub_item.append(wrapped_markup_str)
         sub_first_item.append(first_sub_item)
     # [[[Markup('横桁 Cr0503')]], [[Markup('主桁 Mg0110')], [Markup('床版 Ds0101')]], [[Markup('横桁 Cr0802')]], [[Markup('排水ます Dr0102,0201')]], [[Markup('排水ます Dr0202')]], [[Markup('PC定着部 Cn1101')]], [[Markup('排水ます Dr0102,0201,0202')]]]
-        print("sub_first_itemの作成")
+        #print("sub_first_itemの作成")
         def process_item(item):
             if isinstance(item, Markup):
                 item = str(item)
@@ -271,10 +271,10 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
             result_items.append(item)
 
     def remove_parentheses_from_list(last):
-        print(f"last：{last}")
+        #print(f"last：{last}")
         pattern = re.compile(r"\([^()]*\)")
-        for string in last:
-            print(string)
+        #for string in last:
+            #print(string)
         result = [pattern.sub("", string) for string in last]
         return result
 
@@ -318,49 +318,52 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
         # print("写真の検索にかかった時間_time3: ", time.time() - start3 )
         
         # << S3にアップロードした写真のワイルドカード検索 >>
-        start4 = time.time()
-        s3 = boto3.client('s3')
-
-        bucket_name = 'infraprotect'
-        article_folder_name = table.article.案件名
-        infra_folder_name = table.infra.title
-
-        pattern = r'\(.*?\)|\.jpg|\*'  # カッコとその中・「.jpg」・「*」を削除
-        split_wildcard_lists = [re.split(r'[,/]', re.sub(pattern, '', item)) for item in name_and_wildcardnumber]
-
-        s3_folder_name = [f"{article_folder_name}/{infra_folder_name}/{item[0]}/" for item in split_wildcard_lists if len(item) >= 1]
-        wildcard_picture = tuple(item[1] for item in split_wildcard_lists if len(item) >= 2)  # ('117', '253')
-
-        @lru_cache(maxsize=None)
-        def search_s3_objects(bucket, prefix, pattern):
-            paginate = s3.get_paginator("list_objects_v2")
-            matching_keys = []
-
-            for page in paginate.paginate(Bucket=bucket, Prefix=prefix):
-                if 'Contents' in page:
-                    for obj in page['Contents']:
-                        key = obj['Key']
-                        if fnmatch.fnmatch(key, f"{prefix}*{pattern}.jpg"):
-                            matching_keys.append(key)
-            return matching_keys
-
         sub_dis_items = []
+        picture_upload_check = "in_picture" # TODO：写真のアップロードを確認する
+        if picture_upload_check == "in_picture":
+            sub_dis_items.append("") # 写真を表示しない
+        else:
+            start4 = time.time()
+            s3 = boto3.client('s3')
 
-        def process_search(prefix, pattern):
-            found_keys = search_s3_objects(bucket_name, prefix, pattern)
-            result = []
-            for found_key in found_keys:
-                object_url = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{found_key}"
-                encode_dxf_filename = urllib.parse.quote(object_url, safe='/:')
-                result.append(encode_dxf_filename)
-            return result
+            bucket_name = 'infraprotect'
+            article_folder_name = table.article.案件名
+            infra_folder_name = table.infra.title
 
-        with ThreadPoolExecutor() as executor:
-            future_to_search = {executor.submit(process_search, prefix, pattern): (prefix, pattern) for prefix, pattern in zip(s3_folder_name, wildcard_picture)}
-            
-            for future in as_completed(future_to_search):
-                search_results = future.result()
-                sub_dis_items.extend(search_results)
+            pattern = r'\(.*?\)|\.jpg|\*'  # カッコとその中・「.jpg」・「*」を削除
+            split_wildcard_lists = [re.split(r'[,/]', re.sub(pattern, '', item)) for item in name_and_wildcardnumber]
+
+            s3_folder_name = [f"{article_folder_name}/{infra_folder_name}/{item[0]}/" for item in split_wildcard_lists if len(item) >= 1]
+            wildcard_picture = tuple(item[1] for item in split_wildcard_lists if len(item) >= 2)  # ('117', '253')
+
+            @lru_cache(maxsize=None)
+            def search_s3_objects(bucket, prefix, pattern):
+                paginate = s3.get_paginator("list_objects_v2")
+                matching_keys = []
+
+                for page in paginate.paginate(Bucket=bucket, Prefix=prefix):
+                    if 'Contents' in page:
+                        for obj in page['Contents']:
+                            key = obj['Key']
+                            if fnmatch.fnmatch(key, f"{prefix}*{pattern}.jpg"):
+                                matching_keys.append(key)
+                return matching_keys
+
+            def process_search(prefix, pattern):
+                found_keys = search_s3_objects(bucket_name, prefix, pattern)
+                result = []
+                for found_key in found_keys:
+                    object_url = f"https://{bucket_name}.s3.ap-northeast-1.amazonaws.com/{found_key}"
+                    encode_dxf_filename = urllib.parse.quote(object_url, safe='/:')
+                    result.append(encode_dxf_filename)
+                return result
+
+            with ThreadPoolExecutor() as executor:
+                future_to_search = {executor.submit(process_search, prefix, pattern): (prefix, pattern) for prefix, pattern in zip(s3_folder_name, wildcard_picture)}
+                
+                for future in as_completed(future_to_search):
+                    search_results = future.result()
+                    sub_dis_items.extend(search_results)
         # print("写真のリスト追加にかかった時間_time4: ", time.time() - start4 )
         
 # << ◆写真メモを作成するコード◆ >>
@@ -558,21 +561,29 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
             "⑪床版ひびわれ-d": "最大幅0.0mmの1方向ひびわれ",
             "⑪床版ひびわれ-e": "最大幅0.0mmの角落ちを伴う1方向ひびわれ",
             "⑫うき-e": "コンクリートのうき", # 12
+            "⑬遊間の異常-c": "遊間の狭まり", # 13
+            "⑬遊間の異常-e": "遊間の接触",
+            "⑭路面の凹凸-c": "段差量0.0mmの凹凸", # 14
+            "⑭路面の凹凸-e": "段差量0.0mmの凹凸",
             "⑮舗装の異常-c": "最大幅0.0mmのひびわれ", # 15
             "⑮舗装の異常-e": "最大幅0.0mmのひびわれ・舗装の土砂化",
             "⑯定着部の異常-c": "定着部の損傷", # 16
-            "⑯定着部の異常(分類2)-e": "定着部の著しい損傷",
+            "⑯定着部の異常-e": "定着部の著しい損傷",
+            "⑲変色・劣化-e": "劣化", # 19
             "⑳漏水・滞水-e": "漏水・滞水", # 20
+            "㉑異常な音・振動": "異常な音や振動", # 21
+            "㉒異常なたわみ": "異常なたわみ", # 22
             "㉓変形・欠損-c": "変形・欠損", # 23
             "㉓変形・欠損-e": "著しい変形・欠損",
             "㉔土砂詰まり-e": "土砂詰まり", # 24
+            "㉕沈下・移動・傾斜-e": "下部工や支承部の沈下・移動・傾斜" # 25
         }
 
         def describe_damage(unified_request_list):
             described_list = []
             
             for damage in unified_request_list:
-                print(f"unified_request_list：{unified_request_list}")
+                #print(f"unified_request_list：{unified_request_list}")
                 if damage in replacement_patterns: # 辞書に一致する場合は登録文字を表示
                     described_list.append(replacement_patterns[damage])
                 elif damage.startswith('⑰'): # 17の場合はカッコの中を表示
@@ -680,7 +691,7 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
                     'picture_number': third, 'this_time_picture': sub_dis_items, 'last_time_picture': None, 'textarea_content': combined_data, 
                     'damage_coordinate': damage_coordinate[i], 'picture_coordinate': picture_coordinate[i]}
             
-            print(f"各フィールドのitems：{items}")
+            #print(f"各フィールドのitems：{items}")
         damage_table.append(items)
         # print("damage_tableの作成にかかった時間_time5: ", time.time() - start5 )
     #優先順位の指定
@@ -693,10 +704,12 @@ def create_picturelist(request, table, dxf_filename, search_title_text, second_s
             
     # <<◆ リストの並び替え ◆>>
     def sort_key_function(sort_item):
-        print(f"sort_item['parts_name']：{sort_item['parts_name']}")
+        #print(f"sort_item['parts_name']：{sort_item['parts_name']}")
         if len(sort_item['parts_name']) > 0:
             first_value = sort_item['parts_name'][0][0] # firstキーの最初の要素
-            print(f"first_value：{first_value}") # 主桁 Mg0901
+            pattern = r'\(.*?\)'
+            first_value = re.sub(pattern, '', first_value)
+            #print(f"first_value：{first_value}") # 主桁 Mg0901
 
         if " " in first_value:
             # 部材記号の前にスペースが「含まれている」場合

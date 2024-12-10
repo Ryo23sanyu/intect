@@ -129,6 +129,11 @@
                                         <textarea name="notes" rows="6" style="margin:0 10px;" placeholder="写真メモを入力してください。"></textarea>
                                     {% endif %}
                                 {% endspaceless %}
+
+                            {% comment %} 部材名称<textarea name="notes" rows="1" style="margin:0 5px;">{{ bridge.excel_parts_name|safe }}</textarea>
+                            要素番号<textarea name="notes" rows="1" style="margin:0 5px;">{{ bridge.excel_parts_number|safe }}</textarea>
+                            損傷種類<textarea name="notes" rows="1" style="margin:0 5px;">{{ bridge.excel_damage_name|safe }}</textarea>
+                            損傷判定<textarea name="notes" rows="1" style="margin:0 5px;">{{ bridge.excel_damage_lank|safe }}</textarea> {% endcomment %}
                             </li>
                         </ul>
                     {% endfor %}

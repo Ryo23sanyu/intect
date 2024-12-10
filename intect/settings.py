@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "accounts.apps.AccountsConfig", # accountアプリ
     "infra.apps.InfraConfig",       # infraアプリ
-    #"storages", # pip install django-storages
+    "storages", # pip install django-storages
 ]
 
 MIDDLEWARE = [
