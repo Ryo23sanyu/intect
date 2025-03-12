@@ -399,7 +399,6 @@ def match_s3_objects_with_prefix(bucket_name, prefix, pattern):
 
 
 # << 損傷写真帳の作成 >>
-
 def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.htmlに表示
     start1 = time.time()
     context = {}
@@ -450,10 +449,9 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
         search_title_text = request.GET["search_title_text"]# 検索URL内のsearch_title_textの値（1径間）を取得する
     else:
         search_title_text = "1径間" # 検索URLにsearch_title_textがない場合
-    sub_database_sorted_items = create_picturelist(request, table, dxf_filename, search_title_text, second_search_title_text)
+    sub_database_sorted_items = create_picturelist(request, table, dxf_filename, search_title_text, second_search_title_text) # tasks.py
     
     database_sorted_items = [{'search': search_title_text, **item} for item in sub_database_sorted_items]
-
 
     """辞書型の多重リストをデータベースに登録"""
     # << ['']を外してフラットにする >>
@@ -492,24 +490,49 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
     picture_number_box = []
     
     print("database_sorted_itemsの解析開始")
+    create_picture_number = 1 # 写真番号-00の場合、コード側で1から順に番号を作成
+    # print(f"旗揚げチェック　{database_sorted_items}")
+    
     for damage_data in database_sorted_items:
+        # break
         # 元の辞書から 'picture_number' の値を取得
         #             　辞書型 ↓           ↓ キーの名前      ↓ 存在しない場合、デフォルト値として空白を返す
         picture_number = damage_data.get('picture_number', '')
         # 正規表現で数字のみを抽出
-        if picture_number:
+        if picture_number: # 「写真番号-00」が含まれている場合
             #print(f"picture_number：{picture_number}")
             # 数字のみを抽出
             before_numbers_only = re.findall(r'\d+', str(picture_number)) # ['2']  ['2','3']
-            #print(f"リスト型番号:{before_numbers_only}")
+            # print(f"リスト型番号:{before_numbers_only}")
+            # print(len(before_numbers_only))
             # カウンターに基づいて処理を行う
             #print(index_counter)
             if index_counter == 0:
                 picture_number_box = []
+            
+            if before_numbers_only[0].startswith("00"): # 誤字の調整　['002'] → ['00']
+                before_numbers_only[0] = "00"
+
+            if before_numbers_only[0] == "00": # 写真番号が未設定(「写真番号-00」)の場合
+                before_numbers_only = []
+                zero_number_picture = damage_data.get('this_time_picture', '')
+                # if len(zero_number_picture) == 0: # 写真番号-00はあるが、this_time_pictureに値がない場合の措置(写真指定が間違っていた場合)
+                #     this_time_picture_number = 1
+                this_time_picture_number = len(zero_number_picture) # this_time_pictureの要素数を取得
                 
-            if len(before_numbers_only) > 1: # リストに要素がある場合(写真番号が書かれている場合)
+                if this_time_picture_number > 0:
+                    picture_reserve_box = []
+                    for list_number in zero_number_picture: # リストの要素数ループ(list_numberは使用しない)
+                        if not list_number in picture_reserve_box: # 写真重複チェックボックスにforループ要素がない場合
+                            picture_reserve_box.append(list_number)
+                            
+                            before_numbers_only.append(create_picture_number)
+                            create_picture_number += 1
+                            
+            # ifからelifに変更　↓
+            elif len(before_numbers_only) > 1 and before_numbers_only[0] != "00": # リストに複数の要素(複数の写真番号)がある場合
                 for number in before_numbers_only: # 1つずつの番号に分解
-                    #print(f"{index_counter}番目の要素: {number}")
+                    # print(f"{index_counter}番目の要素: {number}")
                     picture_number_box.append(number)
                     index_counter += 1
                 index_counter = 0
@@ -518,13 +541,19 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                 picture_number_box = []
                 index_counter = 0
 
-            # ↓　インデックスを左に移動した（当初はelseの中）
-            numbers_only = before_numbers_only[index_counter] # カウンターに対応する数字を取得
-            #print(f"オンリーナンバーズ（抽出後）: {numbers_only}")
-            picture_number_box.append(numbers_only)
-            # ↑　同じ
+            if before_numbers_only: # before_numbers_onlyが空の場合、インデックスエラーとなるため、条件分岐を追加
+                # ↓　インデックスを左に移動した（当初はelseの中）
+                numbers_only = before_numbers_only[index_counter] # カウンターに対応する数字を取得
+                # print(f"before_numbers_only　{before_numbers_only}")
+                # print(f"picture_number_box　{picture_number_box}")
+                # print(f"オンリーナンバーズ（抽出後）: {numbers_only}")
+                picture_number_box.append(numbers_only)
+                # ↑　同じ
+            # print(f"picture_number_box　{picture_number_box}")
         else:
             numbers_only = None
+            
+        picture_number_box = before_numbers_only
 
         damage_coordinate = damage_data.get('damage_coordinate', [None, None])
         damage_coordinate_x = damage_coordinate[0] if damage_coordinate else None
@@ -541,6 +570,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
         damages = damage_data.get('damage_name', '')
         #print(f"names:{names}")
         #print(f"damages:{damages}")
+        
+        # print(f"picture_number_box:{picture_number_box}")
         
         split_names = []
 
@@ -577,7 +608,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
         #print("----------------------------------")
         #print(f"damage_data:{damage_data}")
         #print(f"join:{join}")
-        print(f"this_time_picture:{this_time_picture}")
+        # print(f"this_time_picture:{this_time_picture}")
         name_length = len(split_names)
         damage_length = len(damages)
         
@@ -590,7 +621,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
             与えられたnamesを処理し、適切な部分を返す関数
             所見用にparts_splitに格納
             """
-            parts_left = ["主桁", "縦桁", "外ケーブル", "ゲルバー部", "PC定着部", "格点", "コンクリート埋込部", ]
+            parts_left = ["主桁", "縦桁", "外ケーブル", "ゲルバー部", "PC定着部", "格点", "コンクリート埋込部"]
             parts_right = ["横桁", "橋脚", "橋脚[柱部・壁部]", "橋脚[梁部]", "橋脚[隅角部・接合部]", "橋台", "橋台[胸壁]", "橋台[竪壁]", "橋台[翼壁]", "基礎[フーチング]", "基礎"]
             parts_zero = ["床版"]
 
@@ -634,6 +665,11 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
         split_items_table = is_multi_list(split_names)
         damages_items_table = is_multi_list(damages)
         
+        # print(f"split_items_table  {split_names}  /  {split_items_table}")
+        # print(f"damages_items_table  {damages}  /  {damages_items_table}")
+        # print(f"name_length  {split_names}  /  {name_length}")
+        
+        
         if not split_items_table and not damages_items_table and name_length == 1: # 部材名が1つの場合
             picture_number_index = 0 # 写真番号は0から始める
             for single_damage in damages: 
@@ -646,11 +682,12 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                 else:
                     four_numbers = "00"
                 damage_name = flatten(single_damage)
-                #print(f"parts_name1:{parts_name}") # 主桁 Mg0101
-                #print(f"damage_name1:{damage_name}") # ㉓変形・欠損-c
+                # print(f"parts_name1:{parts_name}") # 主桁 Mg0101
+                # print(f"damage_name1:{damage_name}") # ㉓変形・欠損-c
                 parts_split = process_names(flatten(parts_name))
                 # print(f"this_time:{this_time_picture}")
                 list_in_picture = this_time_picture.split(",")
+                # print(f"list_in_picture　{list_in_picture}")
                 for single_picture in list_in_picture:
                     update_fields = {
                         'parts_name': parts_name,
@@ -697,7 +734,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                         current_picture_number = picture_number_box[picture_number_index]
                                     else:
                                         current_picture_number = None
-                                    # print(f"保存後：{current_picture_number}")
+                                
+                                    print(f"保存後：{current_picture_number}")
                                     #print("---------")
                                     if current_picture_number is None: # 写真がない
                                         join_picture_damage_name = BridgePicture.objects.filter(damage_coordinate_x=damage_coordinate_x, damage_coordinate_y=damage_coordinate_y, table=table, infra=infra, article=article)
@@ -732,7 +770,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                     full_damaged_name = ""
                                     for full_damaged_name in joined_picture_damage_name:
                                         if loop_change:
-                                            print(full_damaged_name)
+                                            # print(full_damaged_name)
                                             full_damaged_name = full_damaged_name.join
                                             loop_change = False
                                             
@@ -757,6 +795,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                         bridge_picture = BridgePicture(
                                             image=absolute_image_path, 
                                             picture_number=current_picture_number,
+                                            picture_count=damage_data.get('this_time_picture', ''),
                                             damage_name=damage_name,
                                             parts_split=edited_result_parts_name,
                                             memo=process_inspection_data(full_damaged_name),
@@ -800,8 +839,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                     else:
                         four_numbers = "00"
                     damage_name = flatten(damages[0])
-                    #print(f"parts_name2:{parts_name}")
-                    #print(f"damage_name2:{damage_name}")
+                    # print(f"parts_name2:{parts_name}")
+                    # print(f"damage_name2:{damage_name}")
                     parts_split = process_names(flatten(parts_name))
                     # print(f"this_time:{this_time_picture}")
                     list_in_picture = this_time_picture.split(",")
@@ -828,7 +867,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                             'infra': infra,
                             'article': article,
                             'table': table
-                        }         
+                        }
+                        # print(f"update_fields：{update_fields}")
                     #print(f"径間番号:{span_number}")                 
                     # if FullReportData.objects.filter(join=join, this_time_picture=this_time_picture, span_number=span_number, table=table, damage_coordinate_x=damage_coordinate_x, damage_coordinate_y=damage_coordinate_y):
                         # update_fields['this_time_picture'] = ""
@@ -851,7 +891,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                             current_picture_number = picture_number_box[picture_number_index]
                                         else:
                                             current_picture_number = None
-                                        # print(f"保存後：{current_picture_number}")
+                                        print(f"保存後：{current_picture_number}")
                                         #print("---------")
                                         if current_picture_number is None: # 写真がない
                                             join_picture_damage_name = BridgePicture.objects.filter(damage_coordinate_x=damage_coordinate_x, damage_coordinate_y=damage_coordinate_y, table=table, infra=infra, article=article)
@@ -886,7 +926,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                         full_damaged_name = ""
                                         for full_damaged_name in joined_picture_damage_name:
                                             if loop_change:
-                                                print(full_damaged_name)
+                                                # print(f"full_damaged_name(views.py)　{full_damaged_name}")
                                                 full_damaged_name = full_damaged_name.join
                                                 loop_change = False
                                                 
@@ -910,6 +950,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                             bridge_picture = BridgePicture(
                                                 image=absolute_image_path,
                                                 picture_number=current_picture_number,
+                                                picture_count=damage_data.get('this_time_picture', ''),
                                                 damage_name=damage_name,
                                                 parts_split=edited_result_parts_name,
                                                 memo=process_inspection_data(full_damaged_name),
@@ -982,6 +1023,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                 'article': article,
                                 'table': table
                             }
+                            # print(f"update_fields：{update_fields}")
                         #print(f"径間番号:{span_number}")
                         # if FullReportData.objects.filter(join=join, this_time_picture=this_time_picture, span_number=span_number, table=table, damage_coordinate_x=damage_coordinate_x, damage_coordinate_y=damage_coordinate_y):
                             # update_fields['this_time_picture'] = ""
@@ -1004,7 +1046,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                                 current_picture_number = picture_number_box[picture_number_index]
                                             else:
                                                 current_picture_number = None
-                                            # print(f"保存後：{current_picture_number}")
+                                            print(f"保存後：{current_picture_number}")
                                             # print("---------")
                                             if current_picture_number is None: # 写真がない
                                                 join_picture_damage_name = BridgePicture.objects.filter(damage_coordinate_x=damage_coordinate_x, damage_coordinate_y=damage_coordinate_y, table=table, infra=infra, article=article)
@@ -1040,7 +1082,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                             full_damaged_name = ""
                                             for full_damaged_name in joined_picture_damage_name:
                                                 if loop_change:
-                                                    print(full_damaged_name)
+                                                    # print(f"full_damaged_name(views.py)　{full_damaged_name}")
                                                     full_damaged_name = full_damaged_name.join
                                                     loop_change = False
                                                     
@@ -1064,6 +1106,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                                 bridge_picture = BridgePicture(
                                                     image=absolute_image_path,
                                                     picture_number=current_picture_number,
+                                                    picture_count=damage_data.get('this_time_picture', ''),
                                                     damage_name=damage_name,
                                                     parts_split=edited_result_parts_name,
                                                     memo=process_inspection_data(full_damaged_name),
@@ -1109,13 +1152,15 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                         else:
                             four_numbers = "00"
                         original_damage_name = flatten(damage)
-                        #print(f"parts_name4:{parts_name}")
+                        # print(f"parts_name4:{parts_name}")
                         #print(flatten(damage))
-                        #print(f"damage_name4:{original_damage_name}")
+                        # print(f"damage_name4:{original_damage_name}")
                         parts_split = process_names(flatten(parts_name))
-                        # print(f"this_time:{this_time_picture}")
+                        # print(f"this_time_picture4:{this_time_picture}")
                         space_in_list_picture = this_time_picture.split(",")
                         list_in_picture = [list_in_picture.strip() for list_in_picture in space_in_list_picture] # 写真リスト各要素のスペースを削除
+                        # print(f"space_in_list_picture　{space_in_list_picture}")
+                        # print(f"list_in_picture　{list_in_picture}")
                         picture_number_index = 0 # インデックス番号のリセット
                         # for single_picture in list_in_picture:
                         update_fields = {
@@ -1141,7 +1186,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                             'article': article,
                             'table': table
                         }
-                        # print(f"update_fields：{update_fields}")
+                        # print(f"update_fields_4：{update_fields}")
                         
                         # この部分で今生成したupdate_fieldsでデータを保存または更新します
                         report_data_exists = FullReportData.objects.filter(**update_fields).exists()
@@ -1157,6 +1202,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                         if list_in_picture:# single_picture:
                             for single_picture in list_in_picture:
                                 images = [single_picture]
+                                # print(f"list_in_picture：{list_in_picture}")
+                                # print(f"images　{images}")
                                 update_fields['picture_number'] = picture_counter
                                 picture_counter += 1
                                 # BridgePictureモデルに保存
@@ -1164,23 +1211,32 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                     if numbers_only is not None and numbers_only != '':
                                         #print(f"numbers_only:{numbers_only}")
                                         # print(f"images：{images}")
-                                        for absolute_image_path in images:
-                                            #print(f"absolute_image_path：{absolute_image_path}")
+                                        count = len(before_numbers_only)
+                                        for index, absolute_image_path in enumerate(images):
+                                            # print(f"absolute_image_path　{absolute_image_path}")
                                             try:
                                             # with open(absolute_image_path, 'rb') as image_file:
-                                                #print(f"保存前：{numbers_only}")
-                                                #print(f"オンリーナンバーズ（抽出後）: {picture_number_box}")
+                                                if index < count:
+                                                    numbers_only = numbers_only + index
+                                                    picture_number_index + index
+
+                                                # print(f"保存前：{numbers_only}") # 49
+                                                # print(f"オンリーナンバーズ（抽出後）: {picture_number_box}") # [49, 50, 51]
                                                 
-                                                # print(f"picture_number_index：{picture_number_index}") # 0/1
-                                                # print(f"picture_number_box：{picture_number_box}") # ['10', '11']
-                                                # print(f"len(picture_number_box)：{len(picture_number_box)}") # 2
-                                                # print(f"picture_number_box[picture_number_index]：{picture_number_box[picture_number_index]}") # 10/11
+                                                # print(f"picture_number_index：{picture_number_index}") # 0
+                                                # print(f"picture_number_box：{picture_number_box}") # [49, 50, 51]
+                                                # print(f"len(picture_number_box)：{len(picture_number_box)}") # 3
+                                                # print(f"picture_number_box[picture_number_index]：{picture_number_box[picture_number_index]}") # 49
+                                                
+                                                    
                                                 if picture_number_index < len(picture_number_box):
                                                     current_picture_number = picture_number_box[picture_number_index]
+                                                    # print(f"current_picture_number：{current_picture_number}")
                                                 else:
                                                     current_picture_number = None
+                                                    # print(f"current_picture_number：{current_picture_number}")
                                                     
-                                                #print(f"保存後：{current_picture_number}")
+                                                print(f"保存後：{current_picture_number}")
                                                 #print("---------")
                                                 if current_picture_number is None: # 写真がない
                                                     join_picture_damage_name = BridgePicture.objects.filter(damage_coordinate_x=damage_coordinate_x, damage_coordinate_y=damage_coordinate_y, table=table, infra=infra, article=article)
@@ -1214,7 +1270,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                                 full_damaged_name = ""
                                                 for full_damaged_name in joined_picture_damage_name:
                                                     if loop_change:
-                                                        print(full_damaged_name)
+                                                        # print(full_damaged_name)
                                                         full_damaged_name = full_damaged_name.join
                                                         loop_change = False
 
@@ -1243,6 +1299,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                                         bridge_picture = BridgePicture(
                                                             image=absolute_image_path, 
                                                             picture_number=current_picture_number,
+                                                            picture_count=damage_data.get('this_time_picture', ''),
                                                             damage_name=original_damage_name,
                                                             parts_split=edited_result_parts_name,
                                                             memo=process_inspection_data(full_damaged_name),
@@ -1263,6 +1320,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                                         bridge_picture = BridgePicture(
                                                             image=absolute_image_path, # images[index], 
                                                             picture_number=current_picture_number,
+                                                            picture_count=damage_data.get('this_time_picture', ''),
                                                             damage_name=original_damage_name,
                                                             parts_split=edited_result_parts_name,
                                                             memo=process_inspection_data(full_damaged_name),
@@ -1280,7 +1338,7 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                                                             bridge_picture.save()
                                                         except:
                                                             print("保存失敗")
-                                                    print(f"bridge_picture：{bridge_picture}")
+                                                    # print(f"bridge_picture：{bridge_picture}")
                                                     picture_number_index += 1
                                             except FileNotFoundError:
                                                 print(f"ファイルが見つかりません: {absolute_image_path}")
@@ -1302,7 +1360,9 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
                 
     """辞書型の多重リストをデータベースに登録(ここまで)"""
 
+    print("テンプレートに渡す準備")
     bridges = FullReportData.objects.filter(infra=pk, span_number=search_title_text) # 径間で絞り込み
+    print(bridges)
     # parts_name のカスタム順序リスト
     # parts_order = ['主桁', '横桁', '床版', 'PC定着部', '橋台[胸壁]', '橋台[竪壁]', '橋台[翼壁]', '支承本体', '沓座モルタル', '高欄', '防護柵', '地覆', '伸縮装置', '縁石', '舗装', '排水ます', '排水管']
     # damage_order = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩', '⑪', '⑫', '⑬', '⑭', '⑮', '⑯', '⑰', '⑱', '⑲', '⑳', '㉑', '㉒', '㉓', '㉔', '㉕', '㉖']
@@ -1350,6 +1410,8 @@ def bridge_table(request, article_pk, pk): # idの紐付け infra/bridge_table.h
         ]
             
         picture_data.append({"full_report": data, "matches": matches, "picture": match_details})
+        # print(f"写真ID表示：{matches}")
+        # print(f"写真グループ化：{match_details}")
 
     # matchesのキーに基づき、picturesを交互に選択してユニークに
     matches_seen = {}
@@ -1679,7 +1741,7 @@ def observations_list(request, article_pk, pk):
         # 番号が右に来る名称
         main_parts_list_right = ["横桁", "橋脚", "橋脚[柱部・壁部]", "橋脚[梁部]", "橋脚[隅角部・接合部]", "橋台", "橋台[胸壁]", "橋台[竪壁]", "橋台[翼壁]", "基礎[フーチング]", "基礎"]
         # 番号が00となる名称
-        main_parts_list_zero = ["床版"]
+        main_parts_list_zero = ["床版", "橋門構"]
         
         if report_data_list.exists():
             for report_data in report_data_list:
@@ -1700,18 +1762,24 @@ def observations_list(request, article_pk, pk):
                     result_parts_name = parts_name[:right] + " " + number_part[2:] if len(number_part) < 5 else number_part[2:]
                 elif any(word in parts_name for word in main_parts_list_zero): # main_parts_list_zeroリストと一致した場合
                     right = parts_name.find(" ")
-                    result_parts_name = parts_name[:right] + " 00"
+                    result_parts_name = parts_name[:right] + " 00" # 床版の部材番号「00」を追加
                 else:
                     right = parts_name.find(" ")
-                    result_parts_name = parts_name[:right] + "00"
+                    result_parts_name = parts_name[:right] + "00" # 主要以外の部材番号「00」を追加
 
                 damage_name = report_data.damage_name.split('-')[0] if '-' in report_data.damage_name else report_data.damage_name
                 if damage_name == "NON":
                     damage_name = damage_name
                 elif damage_name[0] != '⑰':
                     damage_name = number_change[damage_name[0]]
-                else:
-                    damage_name = damage_name[1:] 
+                # else:
+                    # damage_name = damage_name[1:]
+                else: # (17)の場合
+                    pattern = r'\(.*?\:'
+                    result_1 = re.sub(pattern, '', damage_name)
+                    result_2 = re.sub("⑰その他", '', result_1[:-1])
+                    damage_name = f"その他({result_2})"
+                    
                 damage_lank = report_data.damage_name.split('-')[1] if '-' in report_data.damage_name else report_data.damage_name
                     
                     
@@ -1781,7 +1849,6 @@ def observations_list(request, article_pk, pk):
             damage_comments[(result_parts_name, damage_name)]['article'] = part.article
             
     for (result_parts_name, damage_name), data in damage_comments.items():
-        print("1571行目")
         damage_lanks = data['damage_lanks']
         damage_max_lank = max(damage_lanks)
         damage_min_lank = min(damage_lanks)
@@ -1800,6 +1867,7 @@ def observations_list(request, article_pk, pk):
         print(f"damage_name：{damage_name}")
         print(f"damage_max_lank：{damage_max_lank}")
         print(f"damage_min_lank：{damage_min_lank}")
+        
         try:
             damage_comment_entry, created = DamageComment.objects.get_or_create(
                 parts_name=result_parts_name,
@@ -1979,7 +2047,6 @@ def observations_list(request, article_pk, pk):
     print("所見一覧の表示までかかった時間_time1: ", time.time() - start1_1 )
     return render(request, 'infra/observer_list.html', context)
 
-
 # << 所見コメントのリアルタイム保存 >>
 def damage_comment_edit(request, pk):
     if request.method == "POST":
@@ -2037,16 +2104,21 @@ def damage_comment_cause_edit(request, pk):
     
     
 # << エクセル出力時に並び替えを行う >>
-parts_name_priority_list = ['主桁', '横桁', '縦桁', '床版', '対傾構', '上横構', '下横構', '外ケーブル', 'ゲルバー部', 'PC定着部', '格点', 'コンクリート埋込部', 'その他', 
+parts_name_priority_list = ['主桁', '横桁', '縦桁', '床版', '対傾構', '上横構', '下横構', 'アーチリブ', '補剛桁', '吊り材', '支柱', '橋門構', '外ケーブル', 'ゲルバー部', 'PC定着部', '格点', 'コンクリート埋込部', 'その他', 
                             '橋脚[柱部・壁部]', '橋脚[梁部]', '橋脚[隅角部・接合部]', '橋台[胸壁]', '橋台[竪壁]', '橋台[翼壁]', '基礎[フーチング]', '基礎', 
                             '支承本体', 'アンカーボルト', '沓座モルタル', '台座コンクリート', '落橋防止システム', 
                             '高欄', '防護柵', '地覆', '中央分離帯', '伸縮装置', '遮音施設', '照明施設', '縁石', '舗装', '排水ます', '排水管', '点検施設', '添架物', '袖擁壁']
    
 # カスタムソートキー関数（エクセル出力時に使用）
-def custom_sort_key(record):
+def custom_sort_key_0708(record):
     # parts_nameリストの優先度を求めるためのインデックス
     parts_name_priority = next((i for i, part in enumerate(parts_name_priority_list) if part in record.parts_name), len(parts_name_priority_list))
-    return (int(record.span_number), parts_name_priority)
+    return (int(record.span_number), parts_name_priority, int(record.parts_number), int(record.number))
+
+def custom_sort_key_1112(record):
+    # parts_nameリストの優先度を求めるためのインデックス
+    parts_name_priority = next((i for i, part in enumerate(parts_name_priority_list) if part in record.parts_name), len(parts_name_priority_list))
+    return (int(record.span_number), parts_name_priority, int(record.number))
 
 # << 管理サイトに登録したデータをエクセルに出力 >>
 def excel_output(request, article_pk, pk):
@@ -2054,7 +2126,7 @@ def excel_output(request, article_pk, pk):
     used_image_list = []
     bridge_name = ""
     import xlwings as xw
-    file_stream = r"C:\Users\dobokuka4\Desktop\intect_dxf\bridge_base.xlsm"
+    file_stream = r"C:\Users\dobokuka4\Desktop\マクロエクセル.xlsm" # ひな形エクセルファイル
     app = xw.App(visible=False)
     # wb = app.books.open(file_stream)
     # bucket_name = 'infraprotect'
@@ -2072,7 +2144,8 @@ def excel_output(request, article_pk, pk):
     ws = wb['その１']
     for record in no01_records:
         bridge_name = record.title
-        print(bridge_name)
+        bridge_article = record.article
+        print(f"橋名：{bridge_name}、案件名：{bridge_article}")
         ws[f'F6'] = record.title # 〇〇橋
         ws[f'O10'] = record.橋長
         ws[f'X11'] = record.全幅員
@@ -2103,10 +2176,10 @@ def excel_output(request, article_pk, pk):
         
     print("その1の作成にかかった時間_time1: ", time.time() - excel_time_1 )
     # << Django管理サイトからデータを取得（その７、８用） >>
-    excel_time_78 = time.time()
+    excel_time_0708 = time.time()
     no0708_records = DamageComment.objects.filter(infra=pk, article=article_pk)
     # 並び替えて出力
-    sorted_records = sorted(no0708_records, key=custom_sort_key)
+    sorted_records = sorted(no0708_records, key=custom_sort_key_0708)
     # カウンタ変数をシートごとに用意
     span = 1
     i07, i08 = 0, 0
@@ -2125,12 +2198,15 @@ def excel_output(request, article_pk, pk):
                 ws = wb['その７']
                 row = initial_row07 + i07 # 行は13から
                 i07 += 1
+                parts_name_sheet0708 = record.comment_parts_name
             else:
                 ws = wb['その８']
                 row = initial_row08 + i08 # 行は13から
                 i08 += 1
+                parts_name_sheet0708 = record.comment_parts_name.replace("00", "")
+                
             # print(f"　エクセル出力:{record.comment_parts_name}{record.parts_number}{record.damage_name}{record.jadgement}")
-            ws[f'F{row}'] = record.comment_parts_name # 主桁
+            ws[f'F{row}'] = parts_name_sheet0708 # 主桁
             ws[f'J{row}'] = record.parts_number # 01
             ws[f'D{row}'] = record.material # S,C
             ws[f'L{row}'] = record.damage_max_lank # e
@@ -2167,14 +2243,14 @@ def excel_output(request, article_pk, pk):
                 ws[f'BC{row}'] = choice_comment # 〇〇が見られる。
             else:
                 ws[f'BC{row}'] = "健全である。"
-    print("その7・8の作成にかかった時間_time78: ", time.time() - excel_time_78 )
+    print("その7・8の作成にかかった時間_time0708: ", time.time() - excel_time_0708 )
     # << （その１０） >>
     excel_time_10 = time.time()
     no10_records = FullReportData.objects.filter(infra=pk, article=article_pk, this_time_picture__isnull=False).exclude(this_time_picture='')
-    #                                                                          this_time_fieldがnull(空)=でない 除外する(this_time_picture='')
+    #                                                                          this_time_fieldがisnull(空)=でない 除外する(this_time_picture='')
     ws = wb['その１０']
-    # print(f"最大径間数：{span}")
-    # print(f"最大径間数：{int(span)}")
+    print(f"最大径間数：{span}")
+    print(f"最大径間数：{int(span)}")
     # << セル位置を作成 >>
     picture_and_spannumber_row = 9 # 部材名・要素番号
     partsname_and_number_row = 10 # 部材名・要素番号
@@ -2184,7 +2260,7 @@ def excel_output(request, article_pk, pk):
     damage_memo_row = 17 # 損傷メモ
     step = 14
     output_data = len(no10_records)
-    num_positions = math.ceil(output_data/3) + int(span) * 6 # 横3列で割って何行になるか
+    num_positions = math.ceil(output_data/3) + int(span) * 12 # 横3列で割って何行になるか
     
     # 関連する列を定義
     picture_columns = ["E", "AE", "BE"] # 写真列
@@ -2192,21 +2268,22 @@ def excel_output(request, article_pk, pk):
     right_columns = ["R", "AR", "BR"] # 右列
     bottom_columns = ["T", "AT", "BT"] # 前回程度+メモ
     # セル位置のリストを生成
-    join_picturenumber_cell = [f"{col}{picture_and_spannumber_row + i * step}" for i in range(num_positions) for col in left_columns] # 写真番号
-    join_spannumber_cell = [f"{col}{picture_and_spannumber_row + i * step}" for i in range(num_positions) for col in right_columns] # 径間番号
-    join_partsname_cell = [f"{col}{partsname_and_number_row + i * step}"    for i in range(num_positions) for col in left_columns] # 部材名
-    join_number_cell = [f"{col}{partsname_and_number_row + i * step}"       for i in range(num_positions) for col in right_columns] # 要素番号
-    join_damagename_cell = [f"{col}{damagename_and_lank_row + i * step}"    for i in range(num_positions) for col in left_columns] # 損傷の種類
-    join_lank_cell = [f"{col}{damagename_and_lank_row + i * step}"          for i in range(num_positions) for col in right_columns] # 損損傷程度
-    join_picture_cell = [f"{col}{picture_start_row + i * step}"             for i in range(num_positions) for col in picture_columns] # 損傷写真
-   #join_lasttime_lank_cell = [f"{col}{lasttime_lank_row + i * step}"       for i in range(num_positions) for col in bottom_columns] # 前回損傷程度
-    join_damage_memo_cell = [f"{col}{damage_memo_row + i * step}"           for i in range(num_positions) for col in bottom_columns] # 損傷メモ
-    print(join_partsname_cell)
+    join_picturenumber_cell = [f"{col}{picture_and_spannumber_row + i * step}" for i in range(num_positions) for col in left_columns]    # 写真番号
+    join_spannumber_cell =    [f"{col}{picture_and_spannumber_row + i * step}" for i in range(num_positions) for col in right_columns]   # 径間番号
+    join_partsname_cell =     [f"{col}{partsname_and_number_row + i * step}"   for i in range(num_positions) for col in left_columns]    # 部材名
+    join_number_cell =        [f"{col}{partsname_and_number_row + i * step}"   for i in range(num_positions) for col in right_columns]   # 要素番号
+    join_damagename_cell =    [f"{col}{damagename_and_lank_row + i * step}"    for i in range(num_positions) for col in left_columns]    # 損傷の種類
+    join_lank_cell =          [f"{col}{damagename_and_lank_row + i * step}"    for i in range(num_positions) for col in right_columns]   # 損損傷程度
+    join_picture_cell =       [f"{col}{picture_start_row + i * step}"          for i in range(num_positions) for col in picture_columns] # 損傷写真
+    # join_lasttime_lank_cell = [f"{col}{lasttime_lank_row + i * step}"       for i in range(num_positions) for col in bottom_columns]   # 前回損傷程度
+    join_damage_memo_cell =   [f"{col}{damage_memo_row + i * step}"            for i in range(num_positions) for col in bottom_columns]  # 損傷メモ
+    # print(join_partsname_cell)
     span = 1
     page_count = 1
     i10 = 0
     initial_row10 = 9 # 1つ目の入力位置
     
+    # ページを増やす場合の関数(hide_sheet_copy_and_paste)
     def hide_sheet_copy_and_paste(wb, sheet_name):
         """シートを再表示してコピーその後非表示に設定"""
 
@@ -2300,7 +2377,8 @@ def excel_output(request, article_pk, pk):
         sheet.print_area = print_area    
         
         hide_sheet.sheet_state = 'hidden'   
-                    
+    # ここまで
+    
     # 全ての結果を入れるリスト
     joined_results = []
 
@@ -2317,10 +2395,14 @@ def excel_output(request, article_pk, pk):
     for picture in damage_picture_data:
         key = (picture.damage_coordinate_x, picture.damage_coordinate_y, picture.table, picture.infra, picture.article)
         matching_records = full_report_dict.get(key) # キー一致のレコードを取得
+
         # print(picture.image)
+        print(f"combined_result：{picture.picture_count}")
+        # print(f"写真のカウント(combined_result)：{len(picture.picture_count)}")
+        print(picture.picture_count.count(".jpg")) # 「.jpg」の数をカウント
+        picture_count_number = picture.picture_count.count(".jpg")
         
         if matching_records:
-            # print("チェック")
             for record in matching_records:
                 combined_result = {
                     'parts_name': record.parts_name,
@@ -2328,19 +2410,154 @@ def excel_output(request, article_pk, pk):
                     'span_number': record.span_number,
                     'textarea_content': record.textarea_content,
                     'image': picture.image,
-                    'picture_number': picture.picture_number
+                    'picture_number': picture.picture_number,
+                    'picture_count' : picture_count_number,
+                    'picture_fullpath' : record.this_time_picture
                 }
                 # imageが空でない場合にのみ追加
                 if combined_result['image']:
                     joined_results.append(combined_result) # 管理サイトにデータが格納されているか確認
-    # print(f"ここは合体したデータ{len(joined_results)}個：{joined_results}")            
+    # print(f"ここは合体したデータ{len(joined_results)}個：{joined_results}") 
+
 
     i10 = 0
     unique_combinations = set()
+    
+    # print(joined_results)
+    picture_number_overlap_check = ""
+    picture_used_check = ""
+    
+    if len(picture_used_check) != 0:
+        print("リストに追加されました")
+    
     for record in joined_results:
+        
+        picture_number_save = record["picture_number"]
+        print(f"写真番号の表示：{picture_number_save}")
+        # record_image = record["image"]
+        
+        # if picture_number_overlap_check != picture_number_save and record["image"]:
+        #     print(f"picture_number_overlap_check：{picture_number_overlap_check}　/　picture_number_save：{picture_number_save}　/　i10：{i10}")
+        #     if record["picture_count"] == 1:
+        #         picture_used_check = ""
+        #         print(f"写真番号の表示：{picture_number_save}　　写真の位置の調整なし")
+        #     elif record["picture_count"] > 1:
+        #         # print("写真の位置の調整を行います")
+
+        #         if record["picture_count"] == 2 and i10 > 1 and (i10 % 3 == 2 or i10 == 2):
+        #             if len(picture_used_check) == 0:
+        #                 i10 += 1
+                        
+        #                 replace_list = record["picture_fullpath"]
+        #                 split_replace_list = replace_list.replace("[", "").replace("]", "").replace("'", "").replace(" ", "")
+        #                 roop_split_list = split_replace_list.split(",")
+                        
+        #                 picture_used_check = []
+        #                 for replace_and_split in roop_split_list:
+        #                     picture_used_check.append(replace_and_split)
+                            
+        #             else:
+        #                 print(f"リスト {picture_used_check}")
+        #                 print(f"要素　 {record_image}")
+        #                 print("")
+        #                 picture_used_check.remove(record["image"])
+                        
+        #         elif record["picture_count"] >= 3 and i10 > 1 and (i10 % 3 != 0 or i10 == 0):
+        #             if len(picture_used_check) == 0:
+        #                 i10 += 2
+                        
+        #                 replace_list = record["picture_fullpath"]
+        #                 split_replace_list = replace_list.replace("[", "").replace("]", "").replace("'", "").replace(" ", "")
+        #                 roop_split_list = split_replace_list.split(",")
+                        
+        #                 picture_used_check = []
+        #                 for replace_and_split in roop_split_list:
+        #                     picture_used_check.append(replace_and_split)
+                            
+        #             else:
+        #                 print(f"リスト {picture_used_check}")
+        #                 print(f"要素　 {record_image}")
+        #                 print("")
+        #                 picture_used_check.remove(record["image"])
+                
+        #     picture_number_overlap_check = picture_number_save
+        #     continue # 次のループに移動
+        # else:
+        #     print("写真データ重複のため、スキップ")   
+        
+                
         span_number = record['span_number'].replace('径間', '')
         # print(f"ここは{span_number}径間目")
         # print(f"その10レコード数：{len(no10_records)}")
+
+        # print(f"対象数:{i10}/{len(no10_records)}")
+        # 部材名を入力形式に分ける( 主桁 0101 )
+        if " " in record['parts_name']:
+            split_parts = record['parts_name'].split(" ")
+            parts_name = split_parts[0]
+            # print(f"1-parts_name：{parts_name}") # 防護柵
+            parts_number = re.search(r'\d+', split_parts[1]).group()
+            # print(f"2-parts_number：{parts_number}") # 0101
+        else:
+            # print("カッコなし")
+            parts_name = ""
+            parts_number = ""
+        # 損傷名を入力形式に分ける( ⑦剥離・鉄筋露出-e )
+        if "-" in record['damage_name']:
+            # 置き換え用の辞書
+            number_change = {
+                '①': '腐食',
+                '②': '亀裂',
+                '③': 'ゆるみ・脱落',
+                '④': '破断',
+                '⑤': '防食機能の劣化',
+                '⑥': 'ひびわれ',
+                '⑦': '剥離・鉄筋露出',
+                '⑧': '漏水・遊離石灰',
+                '⑨': '抜け落ち',
+                '⑩': '補修・補強材の損傷',
+                '⑪': '床版ひびわれ',
+                '⑫': 'うき',
+                '⑬': '遊間の異常',
+                '⑭': '路面の凹凸',
+                '⑮': '舗装の異常',
+                '⑯': '支承部の機能障害',
+                '⑰': 'その他',
+                '⑱': '定着部の異常',
+                '⑲': '変色・劣化',
+                '⑳': '漏水・滞水',
+                '㉑': '異常な音・振動',
+                '㉒': '異常なたわみ',
+                '㉓': '変形・欠損',
+                '㉔': '土砂詰まり',
+                '㉕': '沈下・移動・傾斜',
+                '㉖': '洗掘',
+            }
+
+            first_char = record['damage_name'][0] # 先頭の1文字を取得                
+            # print(f"first_char　{first_char}")
+            damage_name = number_change.get(first_char, "") # 辞書で値を取得
+            damage_lank = record['damage_name'][-1]
+            # print(f"3-damage_name　{damage_name}") # 損傷種類（ ひびわれ ）
+            # print(f"4-damage_lank　{damage_lank}") # 損傷程度（    d    ）
+            # print(f"5-picture_number　{record['picture_number']}")
+        else:
+            damage_name = ""
+            # print(f"3-damage_nameなし") # 損傷種類（ ひびわれ ）
+            damage_lank = ""
+            # print(f"4-damage_lankなし") # 損傷程度（    d    ）     
+                        
+        # print(f"damage_picture_data：{record['image']}")
+        # 最大の写真サイズ（幅、高さ）
+        
+        combination = (record['picture_number'], record['image'], record['span_number'])
+        if combination in unique_combinations:
+            # print(f"Duplicate entry found: {combination}")
+            continue  # Skip duplicate entry
+        else:
+            unique_combinations.add(combination)
+            
+        # 径間番号が1つ上の場合、シートを1ページ追加
         if int(span_number) == span + 1:
             hide_sheet_copy_and_paste(wb, ws)
             span = int(span_number)
@@ -2349,148 +2566,110 @@ def excel_output(request, article_pk, pk):
             page_plus = math.ceil(i10/6)
             # print(f"現在、{page_plus}ページ目")
             i10 = page_plus * 6
-             #print(f"径間が変わるとしたら{i10}個目")
+            #print(f"径間が変わるとしたら{i10}個目")
             ws[join_spannumber_cell[i10]] = span
-            
-        if int(span_number) == span: # 同じ径間の場合
-            if i10 % 6 == 5 and i10 > 10:
-                hide_sheet_copy_and_paste(wb, ws) # プログラム4｜1ページ増やすマクロを実行
 
-            # print(f"対象数:{i10}/{len(no10_records)}")
-            # 部材名を入力形式に分ける( 主桁 0101 )
-            if " " in record['parts_name']:
-                split_parts = record['parts_name'].split(" ")
-                parts_name = split_parts[0]
-                # print(f"1-parts_name：{parts_name}") # 防護柵
-                parts_number = re.search(r'\d+', split_parts[1]).group()
-                # print(f"2-parts_number：{parts_number}") # 0101
-            else:
-                # print("カッコなし")
-                parts_name = ""
-                parts_number = ""
-            # 損傷名を入力形式に分ける( ⑦剥離・鉄筋露出-e )
-            if "-" in record['damage_name']:
-                # 置き換え用の辞書
-                number_change = {
-                    '①': '腐食',
-                    '②': '亀裂',
-                    '③': 'ゆるみ・脱落',
-                    '④': '破断',
-                    '⑤': '防食機能の劣化',
-                    '⑥': 'ひびわれ',
-                    '⑦': '剥離・鉄筋露出',
-                    '⑧': '漏水・遊離石灰',
-                    '⑨': '抜け落ち',
-                    '⑩': '補修・補強材の損傷',
-                    '⑪': '床版ひびわれ',
-                    '⑫': 'うき',
-                    '⑬': '遊間の異常',
-                    '⑭': '路面の凹凸',
-                    '⑮': '舗装の異常',
-                    '⑯': '支承部の機能障害',
-                    '⑰': 'その他',
-                    '⑱': '定着部の異常',
-                    '⑲': '変色・劣化',
-                    '⑳': '漏水・滞水',
-                    '㉑': '異常な音・振動',
-                    '㉒': '異常なたわみ',
-                    '㉓': '変形・欠損',
-                    '㉔': '土砂詰まり',
-                    '㉕': '沈下・移動・傾斜',
-                    '㉖': '洗掘',
-                }
+        # 径間番号が同じ場合かつ、データ番号が10より大きく、6で割り切れる数字かつ、部材名に何かしらの値が入っている場合
+        if int(span_number) == span and i10 % 6 == 5 and i10 > 10 and len(parts_name) > 0:
+            # print(f"データ番号：{i10}　セル番号：{join_picturenumber_cell[i10]}")
+            hide_sheet_copy_and_paste(wb, ws) # プログラム4｜1ページ増やすマクロを実行
 
-                first_char = record['damage_name'][0] # 先頭の1文字を取得                
-                # print(f"first_char　{first_char}")
-                damage_name = number_change.get(first_char, "") # 辞書で値を取得
-                damage_lank = record['damage_name'][-1]
-                # print(f"3-damage_name　{damage_name}") # 損傷種類（ ひびわれ ）
-                # print(f"4-damage_lank　{damage_lank}") # 損傷程度（    d    ）
-                 #print(f"5-picture_number　{record['picture_number']}")
-            else:
-                damage_name = ""
-                # print(f"3-damage_nameなし") # 損傷種類（ ひびわれ ）
-                damage_lank = ""
-                # print(f"4-damage_lankなし") # 損傷程度（    d    ）     
-                          
-            # print(f"damage_picture_data：{record['image']}")
-            # 最大の写真サイズ（幅、高さ）
-            
-            combination = (record['picture_number'], record['image'], record['span_number'])
-            if combination in unique_combinations:
-                # print(f"Duplicate entry found: {combination}")
-                continue  # Skip duplicate entry
-            else:
-                unique_combinations.add(combination)
-
-            max_width, max_height = 264.5, 198.375 # 4:3
-            ws[join_picturenumber_cell[i10]] = record['picture_number'] # 写真番号
-            ws[join_partsname_cell[i10]] = parts_name # 部材名
-            ws[join_number_cell[i10]] = parts_number # 要素番号
-            ws[join_damagename_cell[i10]] = damage_name # 損傷の種類
-            ws[join_lank_cell[i10]] = damage_lank # 損傷の程度
-                # 写真の有無を判断
-            print(i10)
-            print(parts_name)
-            try:
-                image_path = record['image'] # ImageFieldの場合は.pathをつける
-                # print(image_path)
-                used_image_list.append(image_path)# 見つけた写真URLをリストに格納
-                
-            except AttributeError:
-                # print(f"エントリに 'this_time_picture' が存在しないか、無効です")
-                continue  # このエントリをスキップ
-            
-            # image_path = os.path.join(settings.BASE_DIR, record['image'].lstrip('/')) # フルパスに変更
-            # print(f"Calculated image path: {image_path}") 
-            
-            # TODO：openpyxlはローカル写真の貼付けのみ、S3バケットの写真をDLせず貼付けることは不可能
-            # 画像をS3からダウンロードしてメモリ上に保存
-            try:
-                response = requests.get(image_path) # 指定したURLから画像データを取得
-                response.raise_for_status()  # リクエストが成功したか確認(失敗したら例外処理となる)
-
-                image_data = response.content
-                pil_img = PILImage.open(io.BytesIO(image_data))
-                
-                width, height = pil_img.size
-                aspect_ratio = width / height
-
-                if aspect_ratio > max_width / max_height:
-                    new_width = min(width, max_width)
-                    new_height = new_width / aspect_ratio
-                else:
-                    new_height = min(height, max_height)
-                    new_width = new_height * aspect_ratio
-
-                resized_img = pil_img.resize((int(new_width), int(new_height)))
-                
-                # 画像を一時ファイルとして保存
-                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
-                    resized_img_path = tmp.name# 写真のリサイズ
-                    resized_img.save(resized_img_path)# 一時ファイルに保存
-                    img = OpenpyxlImage(resized_img_path)
-
-                img.anchor = ws[join_picture_cell[i10]].coordinate
-                print(ws[join_picture_cell[i10]])
-                ws.add_image(img)
-                
-            except requests.exceptions.RequestException as e:
-                print(f"写真貼付けエラー: {e}")
-                
-            ws[join_damage_memo_cell[i10]] = record['textarea_content'] # メモ
-            # print(record['textarea_content'])
+        # print(f"写真のカウント：{record['picture_count']}")
+        # 写真番号が設定されている + 判定が「a」 + 3の倍数のとき、前回写真をとなりにするため、1枚分ずらす
+        
+        # article = Article.objects.filter(id=article_pk).first()
+        # infra = Infra.objects.filter(id=pk).first()
+        # print(article)
+        # print(infra)
+        
+        # bridge_picture_on_no10 = ExcelNo10Output(
+        #     picture_number = record['picture_number'],
+        #     parts_name = parts_name,
+        #     parts_number = parts_number,
+        #     damage_name = damage_name,
+        #     damage_lank = damage_lank,
+        #     picture_url = record['image'],
+        #     memo = record['textarea_content'],
+        #     article = Article.objects.filter(id=article_pk).first(),
+        #     infra = Infra.objects.filter(id=pk).first()
+        # )
+        # bridge_picture_on_no10.save()
+        
+        if record['picture_number'] != None and damage_lank == "a" and (i10 % 3 == 2 or i10 == 2):
             i10 += 1
-            # if damage_lank == "a":
-            #     i10 += 1
-            # print(i10)
+            
+        # save_record_picture_count = record['picture_count']
+        
+        # bridge_article = 葛南土木
+        # bridge_infra = 今川橋
+        
+        max_width, max_height = 264.5, 198.375 # 4:3
+        ws[join_picturenumber_cell[i10]] = record['picture_number'] # 写真番号
+        ws[join_partsname_cell[i10]] = parts_name # 部材名
+        ws[join_number_cell[i10]] = parts_number # 要素番号
+        ws[join_damagename_cell[i10]] = damage_name # 損傷の種類
+        ws[join_lank_cell[i10]] = damage_lank # 損傷の程度
+
+        try:
+            image_path = record['image'] # ImageFieldの場合は.pathをつける
+            # print(image_path)
+            used_image_list.append(image_path)# 見つけた写真URLをリストに格納
+            
+        except AttributeError:
+            # print(f"エントリに 'this_time_picture' が存在しないか、無効です")
+            continue  # このエントリをスキップ
+        
+        # image_path = os.path.join(settings.BASE_DIR, record['image'].lstrip('/')) # フルパスに変更
+        # print(f"Calculated image path: {image_path}") 
+        
+        # TODO：openpyxlはローカル写真の貼付けのみ、S3バケットの写真をDLせず貼付けることは不可能
+        # 画像をS3からダウンロードしてメモリ上に保存
+        try:
+            response = requests.get(image_path) # 指定したURLから画像データを取得
+            response.raise_for_status()  # リクエストが成功したか確認(失敗したら例外処理となる)
+
+            image_data = response.content
+            pil_img = PILImage.open(io.BytesIO(image_data))
+            
+            width, height = pil_img.size
+            aspect_ratio = width / height
+
+            if aspect_ratio > max_width / max_height:
+                new_width = min(width, max_width)
+                new_height = (new_width / aspect_ratio)
+            else:
+                new_height = min(height, max_height)
+                new_width = (new_height * aspect_ratio)
+
+            resized_img = pil_img.resize((int(new_width), int(new_height)))
+            
+            # 画像を一時ファイルとして保存
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+                resized_img_path = tmp.name # 写真のリサイズ
+                resized_img.save(resized_img_path) # 一時ファイルに保存
+                # img = OpenpyxlImage(resized_img_path) # 従来(画像が荒い)
+                img = OpenpyxlImage(tmp.name) # 画像の荒さ解消のためのテスト
+
+            img.anchor = ws[join_picture_cell[i10]].coordinate
+            ws.add_image(img)
+            
+        except requests.exceptions.RequestException as e:
+            print(f"写真貼付けエラー: {e}")
+            
+        ws[join_damage_memo_cell[i10]] = record['textarea_content'] # メモ
+        # print(record['textarea_content'])
+        i10 += 1
+        if damage_lank == "a" and len(parts_name) > 0:
+            ws[join_picturenumber_cell[i10]] = "" # 写真番号のセルを空白にする
+            i10 += 1
+        # print(i10)
     print("その10の作成にかかった時間_time10: ", time.time() - excel_time_10 )
     
     # << Django管理サイトからデータを取得（その１１、１２用） >>
     excel_time_1112 = time.time()
     no1112_records = DamageList.objects.filter(infra=pk, article=article_pk)
     # 並び替え
-    sorted_records = sorted(no1112_records, key=custom_sort_key)
+    sorted_records = sorted(no1112_records, key=custom_sort_key_1112)
     span = 1
     i11, i12, i13 = 0, 0, 0
     initial_row11, initial_row12 = 10, 10 # 1つ目の入力位置
@@ -2502,8 +2681,9 @@ def excel_output(request, article_pk, pk):
             span = int(record.span_number)
             initial_row11 = initial_row11 + 18 * math.ceil(i11 / 18) # 10+18×(ページ数)
             initial_row12 = initial_row12 + 18 * math.ceil(i12 / 18) # 10,28,46(+18)
-            initial_row13 = initial_row13 + 28 * math.ceil(i13 / 18) # 10,38,66(+28)
-            i11, i12, i13 = 0, 0, 0
+            # initial_row13 = initial_row13 + 28 * math.ceil(i13 / 18) # 10,38,66(+28)
+            # i11, i12, i13 = 0, 0, 0
+            i11, i12 = 0, 0
         if int(record.span_number) == span:
             if record.main_parts == "〇":
                 ws = wb['その１１']
@@ -2527,7 +2707,7 @@ def excel_output(request, article_pk, pk):
     # 現在の日時を取得してファイル名に追加
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     # 新しいファイル名の生成
-    new_filename = f"{bridge_name}(作成：{timestamp}).xlsm"# _{original_file_path}"
+    new_filename = f"{bridge_name}(作成日時：{timestamp}).xlsm"# _{original_file_path}"
     # サンプル橋(作成：20241015_114539)_base.xlsm
     
     exsel_time_2 = time.time()

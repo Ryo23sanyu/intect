@@ -111,10 +111,12 @@ class Material(models.Model):
         return self.材料
     
 # << 要素番号の登録 >>
+工種_CHOICES = (('上部構造', '上部構造'),('下部構造', '下部構造'),('カルバート', 'カルバート'),('支承部', '支承部'),('路上', '路上'),('排水施設', '排水施設'),('その他', 'その他'))
 class PartsName(models.Model):
     部材名 = models.CharField(max_length=255)
     記号 = models.CharField(max_length=50)
     主要部材 = models.BooleanField()
+    工種 = models.CharField(max_length=100, choices=工種_CHOICES, null=True, blank=True)
     material = models.ManyToManyField(Material) # 多対多のリレーションに必要
     display_order = models.PositiveIntegerField(default=0) # 順番設定用
     class Meta:
@@ -158,6 +160,7 @@ class PartsNumber(models.Model):
 class BridgePicture(models.Model):
     image = models.ImageField(upload_to='photos/') # 写真データ
     picture_number = models.IntegerField(null=True, blank=True) # 数字のみの入力
+    picture_count = models.TextField(null=True, blank=True)# models.TextField()：文字数上限なし
     damage_name = models.CharField(max_length=255) # '①腐食(大大)-e', '⑤防食機能の劣化(分類1)-e'
     parts_split = models.CharField(max_length=255) # '排水管 Dp00'
     damage_coordinate_x = models.CharField(max_length=255) # '538482.3557216563', '229268.8593029478'
@@ -212,6 +215,22 @@ class FullReportData(models.Model):
     def __str__(self):
         return f"{self.parts_name}　{self.damage_name}：{self.span_number}　({self.special_links})"
 
+# class ExcelNo10Output(models.Model):
+#     picture_number = models.CharField(max_length=255) # 1
+#     parts_name = models.CharField(max_length=255) # 主桁
+#     parts_number = models.CharField(max_length=255) # 0101
+#     damage_name = models.CharField(max_length=255) # 腐食
+#     damage_lank = models.CharField(max_length=255) # e
+#     picture_url = models.ImageField(upload_to='photos/') # 写真データ
+#     memo = models.TextField()# models.TextField()：文字数上限なし
+#     article = models.ForeignKey(Article, on_delete=models.CASCADE) # 一意にするためのarticle
+#     infra = models.ForeignKey(Infra, verbose_name="橋梁名", on_delete=models.CASCADE) # 一意にするためのinfra
+#     class Meta:
+#         # ユニークの設定(fieldsの組み合わせを一意とする。nullが許可されているとデータが重複する可能性があるため、notnullの要素を扱う)
+#         constraints = [
+#             models.UniqueConstraint(fields=['picture_number', 'infra', 'article'], name='unique_excel_number10')
+#         ]
+    
 # << 損傷データを所見用に変換して登録 >>
 class DamageList(models.Model):
     parts_name = models.CharField(max_length=255) # 主桁
@@ -258,46 +277,51 @@ class DamageComment(models.Model):
     """ 並び替えに必要な動作(値を入れるフィールドを用意) """
     def save(self, *args, **kwargs):
         replace_dict = { # DamageCommentのreplace_nameに格納される番号
-            "主桁": "01",
-            "横桁": "02",
-            "縦桁": "03",
-            "床版": "04",
-            "対傾構": "05",
-            "上横構": "06",
-            "下横構": "07",
-            "外ケーブル": "08",
-            "ゲルバー部": "09",
-            "PC定着部": "10",
-            "格点": "11",
-            "コンクリート埋込部": "12",
-            "その他": "13",
-            "橋脚[柱部・壁部]": "14",
-            "橋脚[梁部]": "15",
-            "橋脚[隅角部・接合部]": "16",
-            "橋台[胸壁]": "17",
-            "橋台[竪壁]": "18",
-            "橋台[翼壁]": "19",
-            "基礎[フーチング]": "20",
-            "基礎": "21",
-            "支承本体": "22",
-            "アンカーボルト": "23",
-            "沓座モルタル": "24",
-            "台座コンクリート": "25",
-            "落橋防止システム": "26",
-            "高欄": "27",
-            "防護柵": "28",
-            "地覆": "29",
-            "中央分離帯": "30",
-            "伸縮装置": "31",
-            "遮音施設": "32",
-            "照明施設": "33",
-            "縁石": "34",
-            "舗装": "35",
-            "排水ます": "36",
-            "排水管": "37",
-            "点検施設": "38",
-            "添架物": "39",
-            "袖擁壁": "40",
+            "主桁": "101",
+            "横桁": "102",
+            "縦桁": "103",
+            "床版": "104",
+            "対傾構": "105",
+            "上横構": "106",
+            "下横構": "107",
+            "アーチリブ": "108",
+            "補剛桁": "109",
+            "吊り材": "110",
+            "支柱": "111",
+            "橋門構": "112",
+            "外ケーブル": "113",
+            "ゲルバー部": "114",
+            "PC定着部": "115",
+            "格点": "116",
+            "コンクリート埋込部": "117",
+            "その他": "118",
+            "橋脚[柱部・壁部]": "201",
+            "橋脚[梁部]": "202",
+            "橋脚[隅角部・接合部]": "203",
+            "橋台[胸壁]": "204",
+            "橋台[竪壁]": "205",
+            "橋台[翼壁]": "206",
+            "基礎[フーチング]": "207",
+            "基礎": "208",
+            "支承本体": "301",
+            "アンカーボルト": "302",
+            "沓座モルタル": "303",
+            "台座コンクリート": "304",
+            "落橋防止システム": "305",
+            "高欄": "401",
+            "防護柵": "402",
+            "地覆": "403",
+            "中央分離帯": "404",
+            "伸縮装置": "405",
+            "遮音施設": "406",
+            "照明施設": "407",
+            "縁石": "408",
+            "舗装": "409",
+            "排水ます": "410",
+            "排水管": "411",
+            "点検施設": "412",
+            "添架物": "413",
+            "袖擁壁": "414",
         }
         # 正規表現でスペース+2桁以上の数字を抽出
         match = re.search(r'(\D+)\s(\d{2,})', self.parts_name)
@@ -324,6 +348,12 @@ class DamageComment(models.Model):
         # materialの部分一致チェックとnumberの設定
         if '腐食' in self.damage_name:
             self.number = 1
+        elif '亀裂' in self.damage_name:
+            self.number = 2
+        elif 'ゆるみ・脱落' in self.damage_name:
+            self.number = 3
+        elif '破断' in self.damage_name:
+            self.number = 4
         elif '防食機能の劣化' in self.damage_name:
             self.number = 5
         elif 'ひびわれ' in self.damage_name:
@@ -332,18 +362,40 @@ class DamageComment(models.Model):
             self.number = 7
         elif '漏水・遊離石灰' in self.damage_name:
             self.number = 8
+        elif '抜け落ち' in self.damage_name:
+            self.number = 9
+        elif '補修・補強材の損傷' in self.damage_name:
+            self.number = 10
+        elif '床版ひびわれ' in self.damage_name:
+            self.number = 11
         elif 'うき' in self.damage_name:
             self.number = 12
+        elif '遊間の異常' in self.damage_name:
+            self.number = 13
         elif '路面の凹凸' in self.damage_name:
             self.number = 14
         elif '舗装の異常' in self.damage_name:
             self.number = 15
+        elif '支承部の機能障害' in self.damage_name:
+            self.number = 16
+        elif '定着部の異常' in self.damage_name:
+            self.number = 18
+        elif '変色・劣化' in self.damage_name:
+            self.number = 19
         elif '漏水・滞水' in self.damage_name:
             self.number = 20
-        elif '変色・劣化' in self.damage_name:
+        elif '異常な音・振動' in self.damage_name:
+            self.number = 21
+        elif '異常なたわみ' in self.damage_name:
+            self.number = 22
+        elif '変形・欠損' in self.damage_name:
             self.number = 23
         elif '土砂詰まり' in self.damage_name:
             self.number = 24
+        elif '沈下・移動・傾斜' in self.damage_name:
+            self.number = 25
+        elif '洗掘' in self.damage_name:
+            self.number = 26
         elif 'NON' in self.damage_name:
             self.number = 27
         else:

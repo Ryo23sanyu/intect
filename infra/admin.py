@@ -29,8 +29,8 @@ class TableAdmin(admin.ModelAdmin): # 損傷写真帳
 admin.site.register(Table, TableAdmin)
 
 class PartsNameAdmin(admin.ModelAdmin): # 部材名登録
-    list_display = ('部材名', '記号', 'get_materials', '主要部材', 'display_order') # 表示するフィールド
-    list_editable = ('display_order',) # 管理画面でdisplay_orderフィールドを直接編集
+    list_display = ('部材名', '記号', '工種', 'get_materials', '主要部材', 'display_order') # 表示するフィールド
+    list_editable = ('工種', 'display_order',) # 管理画面でdisplay_orderフィールドを直接編集
     ordering = ('display_order',) # 順序フィールドで並べ替え
     def get_materials(self, obj): # 多対多フィールドの内容をカスタムメソッドで取得して文字列として返す
         return ", ".join([material.材料 for material in obj.material.all()])
@@ -38,7 +38,7 @@ class PartsNameAdmin(admin.ModelAdmin): # 部材名登録
 admin.site.register(PartsName, PartsNameAdmin)
 
 class PartsNumberAdmin(admin.ModelAdmin): # 番号登録
-    list_display = ('infra', 'parts_name', 'symbol', 'number', 'get_material_list', 'main_frame', 'span_number', 'article', 'unique_id')
+    list_display = ('infra', 'parts_name', 'symbol', 'number', 'get_material_list', 'main_frame', 'span_number', 'article') # unique_id
     ordering = ('infra', 'span_number', 'parts_name', 'number')
 admin.site.register(PartsNumber, PartsNumberAdmin)
 
@@ -54,7 +54,7 @@ admin.site.register(DamageList, DamageListAdmin)
 
 class BridgePictureAdmin(admin.ModelAdmin): # 写真登録
     list_display = ('infra', 'parts_split', 'damage_name', 'picture_number', 'image', 'image_tag', 'span_number', 'article')
-    search_fields = ('parts_split', 'infra__title', 'article__案件名') # 検索対象：「infraのtitleフィールド」と指定
+    search_fields = ('parts_split', 'infra__title', 'article__案件名', 'image') # 検索対象：「infraのtitleフィールド」と指定
     # 管理サイトに写真を表示する方法
     def image_tag(self, obj):
         if obj.image:
@@ -63,6 +63,10 @@ class BridgePictureAdmin(admin.ModelAdmin): # 写真登録
     image_tag.short_description = 'Image'
 admin.site.register(BridgePicture, BridgePictureAdmin)
 
+# class ExcelNo10OutputAdmin(admin.ModelAdmin): # 損傷写真帳に貼付けるためのクラス
+#     list_display = ('infra', 'picture_number', 'article')
+#     search_fields = ('infra', 'article')
+# admin.site.register(ExcelNo10Output, ExcelNo10OutputAdmin)
 
 class FullReportDataAdmin(admin.ModelAdmin): # 損傷写真帳の全データ
     list_display = ('parts_name', 'four_numbers', 'damage_name', 'picture_number', 'span_number', 'infra', 'article')
@@ -119,7 +123,12 @@ class CustomPartsNameFilter(admin.SimpleListFilter):
             ('床版', '床版'),
             ('対傾構', '対傾構'),
             ('上横構', '上横構'),
-            ('下横構', '下横構'),
+            ('下横構', '下横構'), 
+            ('アーチリブ', 'アーチリブ'),
+            ('補剛桁', '補剛桁'),
+            ('吊り材', '吊り材'),
+            ('支柱', '支柱'),
+            ('橋門構', '橋門構'),
             ('外ケーブル', '外ケーブル'),
             ('ゲルバー部', 'ゲルバー部'),
             ('PC定着部', 'PC定着部'),
